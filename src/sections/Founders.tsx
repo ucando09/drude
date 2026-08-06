@@ -1,25 +1,26 @@
 import Reveal from "../components/Reveal";
 
-/* TODO(founders): swap in real names, roles, resume lines, and links. */
 const FOUNDERS = [
   {
-    initials: "IL",
-    name: "Founder Name",
-    role: "Co-founder · Hardware",
+    initials: "JC",
+    name: "Jinho Chang",
+    role: "Co-founder · CEO",
     lines: [
-      "Resume line one — degree, lab, or company",
-      "Resume line two — the project or award that matters",
-      "Resume line three — why they can build this",
+      "Econ major @ CAU / Econometrics-Based Empirical Research",
+      "Excellence Award, Economics Forum / Presented research at National Taiwan University (NTU) as the university representative",
+      "President, Economics Society S-Kian — Managed 77 members · Officially certified by Korea Investment & Securities · Established inter-university partnerships",
+      "A dream: hardware, accessible to everyone.",
     ],
   },
   {
-    initials: "CF",
-    name: "Co-founder Name",
-    role: "Co-founder · Software",
+    initials: "IL",
+    name: "Ian Lee",
+    role: "Co-founder · CTO",
     lines: [
-      "Resume line one — degree, lab, or company",
-      "Resume line two — the project or award that matters",
-      "Resume line three — why they can build this",
+      "EEE major @ CAU",
+      "Engineered a computer vision workflow to detect vehicle presence and automate parking availability tracking",
+      "Experience in combining hands-on software development expertise with experience leading full-lifecycle engineering projects",
+      "i like building stuff i guess",
     ],
   },
 ];
