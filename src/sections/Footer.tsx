@@ -7,8 +7,8 @@ export default function Footer() {
           <p className="footer-tag">P-say-B — vibe-coding, for hardware.</p>
         </div>
         <div className="footer-right">
-          <a className="footer-mail" href="mailto:iannleee@naver.com">
-            iannleee@naver.com
+          <a className="footer-mail" href="mailto:iannleee@cau.ac.kr">
+            iannleee@cau.ac.kr
           </a>
           <span className="footer-copy">© 2026 Drude. Seoul, KR.</span>
         </div>

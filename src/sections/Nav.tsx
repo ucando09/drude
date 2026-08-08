@@ -17,7 +17,7 @@ export default function Nav() {
           <span className="wordmark">Drude</span>
           <span className="nav-chip">P-say-B · alpha</span>
         </div>
-        <a className="nav-contact" href="mailto:iannleee@naver.com">
+        <a className="nav-contact" href="mailto:iannleee@cau.ac.kr">
           Contact
         </a>
       </div>
