@@ -240,11 +240,6 @@ export function createBridge(iframe: HTMLIFrameElement) {
       w.toast = original;
       openingLayout();
     },
-
-    on(type: "pointerdown" | "keydown", handler: () => void) {
-      doc()?.addEventListener(type, handler, true);
-      return () => doc()?.removeEventListener(type, handler, true);
-    },
   };
 }
 
@@ -267,7 +262,6 @@ const LOOP_HOLD_MS = 5000;
  */
 export function createDriver(bridge: Bridge, events: DriverEvents) {
   let token = 0;
-  let submitted = false;
   const timers = new Set<number>();
 
   function wait(ms: number, mine: number) {
@@ -320,7 +314,6 @@ export function createDriver(bridge: Bridge, events: DriverEvents) {
 
   async function runOne(index: number, mine: number) {
     const chapter = CHAPTERS[index];
-    submitted = false;
 
     // the mock cannot cancel a reply in flight, so wait it out rather than
     // reshuffling the thread underneath it
@@ -339,7 +332,6 @@ export function createDriver(bridge: Bridge, events: DriverEvents) {
     if (!(await wait(420, mine))) return false;
 
     bridge.submit();
-    submitted = true;
     // the panel opens on the prompt landing in the chat, not before it
     bridge.showCanvas();
     events.onPhase("streaming", index);
@@ -381,10 +373,5 @@ export function createDriver(bridge: Bridge, events: DriverEvents) {
     }
   }
 
-  return {
-    play,
-    cancel,
-    /** true if the interrupted chapter had already been sent */
-    wasSubmitted: () => submitted,
-  };
+  return { play, cancel };
 }

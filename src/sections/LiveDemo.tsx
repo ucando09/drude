@@ -31,7 +31,6 @@ function LiveDemoDesktop() {
 
   const [inView, setInView] = useState(false);
   const [ready, setReady] = useState(false);
-  const [paused, setPaused] = useState(false);
   const [phase, setPhase] = useState<DriverPhase>("idle");
   const [active, setActive] = useState(-1);
   const [done, setDone] = useState<number[]>([]);
@@ -39,73 +38,36 @@ function LiveDemoDesktop() {
   const bridgeRef = useRef<Bridge | null>(null);
   const driverRef = useRef<ReturnType<typeof createDriver> | null>(null);
   const attachedRef = useRef<HTMLIFrameElement | null>(null);
-  const detachRef = useRef<Array<() => void>>([]);
-  const pausedRef = useRef(false);
-  const startedRef = useRef(false);
-  const activeRef = useRef(-1);
-  const resumeAtRef = useRef(0);
 
-  /**
-   * Any real touch inside the frame pauses the walkthrough rather than killing
-   * it — the visitor is reading, not necessarily taking over for good. Our own
-   * driving can't trigger this: element.click() fires only `click`, and typing
-   * dispatches `input`, so neither reaches these listeners.
-   */
-  const pause = useCallback(() => {
-    if (pausedRef.current || !startedRef.current) return;
-    pausedRef.current = true;
+  const handleLoaded = useCallback((iframe: HTMLIFrameElement) => {
+    if (attachedRef.current === iframe) return;
+    attachedRef.current = iframe;
 
-    const driver = driverRef.current;
-    const sent = driver?.wasSubmitted() ?? false;
-    resumeAtRef.current = sent ? activeRef.current + 1 : Math.max(activeRef.current, 0);
+    const bridge = createBridge(iframe);
+    bridge.patchFocus();
+    bridge.injectStyles();
+    bridge.openingLayout();
 
-    driver?.cancel();
-    setPhase("idle");
-    setPaused(true);
+    bridgeRef.current = bridge;
+    driverRef.current = createDriver(bridge, {
+      onPhase: (next, index) => {
+        setPhase(next);
+        setActive(index);
+      },
+      onChapterDone: (index) =>
+        setDone((current) => (current.includes(index) ? current : [...current, index])),
+      onLoop: () => setDone([]),
+    });
+
+    setReady(true);
   }, []);
-
-  const handleLoaded = useCallback(
-    (iframe: HTMLIFrameElement) => {
-      if (attachedRef.current === iframe) return;
-      attachedRef.current = iframe;
-
-      const bridge = createBridge(iframe);
-      bridge.patchFocus();
-      bridge.injectStyles();
-      bridge.openingLayout();
-
-      bridgeRef.current = bridge;
-      driverRef.current = createDriver(bridge, {
-        onPhase: (next, index) => {
-          activeRef.current = index;
-          setPhase(next);
-          setActive(index);
-        },
-        onChapterDone: (index) =>
-          setDone((current) => (current.includes(index) ? current : [...current, index])),
-        onLoop: () => setDone([]),
-      });
-      detachRef.current = [bridge.on("pointerdown", pause), bridge.on("keydown", pause)];
-
-      setReady(true);
-    },
-    [pause]
-  );
 
   const playFrom = useCallback((index: number) => {
     const driver = driverRef.current;
     if (!driver) return;
-    startedRef.current = true;
-    pausedRef.current = false;
-    activeRef.current = index;
-    setPaused(false);
     setActive(index);
     void driver.play(index);
   }, []);
-
-  const resume = useCallback(() => {
-    playFrom(Math.min(resumeAtRef.current, CHAPTERS.length - 1));
-  }, [playFrom]);
 
   /* The screen is fixed in the page, so visibility is what gates the loop.
      Hysteresis on purpose: it starts once 30% is showing but only stops when the
@@ -127,11 +89,11 @@ function LiveDemoDesktop() {
 
   const live = inView && ready;
 
-  /* The walkthrough runs itself on arrival and loops. It stops when the section
-     scrolls away rather than churning through prompts off-screen, and picks the
-     story up from the top when you come back. Under reduced motion it never
-     starts — the mock's boot state is already a populated Layout thread with a
-     routed board. */
+  /* The walkthrough runs itself and never stops for the visitor — poking at the
+     app does not interrupt it. It only pauses when the section scrolls away,
+     rather than churning through prompts off-screen, and starts the story from
+     the top when you come back. Under reduced motion it never starts: the mock's
+     boot state is already a populated Layout thread with a routed board. */
   useEffect(() => {
     if (!ready || reduced) return;
 
@@ -139,7 +101,6 @@ function LiveDemoDesktop() {
       driverRef.current?.cancel();
       return;
     }
-    if (pausedRef.current) return;
 
     const timer = window.setTimeout(() => {
       bridgeRef.current?.reset();
@@ -152,8 +113,6 @@ function LiveDemoDesktop() {
   useEffect(
     () => () => {
       driverRef.current?.cancel();
-      detachRef.current.forEach((off) => off());
-      detachRef.current = [];
       bridgeRef.current?.restore();
     },
     []
@@ -168,11 +127,8 @@ function LiveDemoDesktop() {
     railRef.current?.querySelectorAll("button")[next]?.focus();
   };
 
-  const canResume = paused && resumeAtRef.current < CHAPTERS.length;
-
-  const caption = paused
-    ? "Paused — you're driving now. Pick a chapter, or pick up where it left off."
-    : phase === "waiting"
+  const caption =
+    phase === "waiting"
       ? "Letting the current reply finish…"
       : active >= 0
         ? CHAPTERS[active].caption
@@ -200,7 +156,7 @@ function LiveDemoDesktop() {
               className={`demo-chip mono${active === index ? " on" : ""}${
                 done.includes(index) ? " done" : ""
               }`}
-              data-phase={active === index && !paused ? phase : undefined}
+              data-phase={active === index ? phase : undefined}
               onClick={() => playFrom(index)}
             >
               <span className="demo-chip-idx">{index + 1}</span>
@@ -209,18 +165,11 @@ function LiveDemoDesktop() {
           ))}
         </div>
 
-        <div className="demo-status">
-          {/* not rendered visually — keeps chapter changes announced, since the
-              panel the rail controls lives inside an iframe */}
-          <p className="demo-visually-hidden" aria-live="polite">
-            {caption}
-          </p>
-          {canResume ? (
-            <button type="button" className="demo-resume mono" onClick={resume}>
-              Resume walkthrough
-            </button>
-          ) : null}
-        </div>
+        {/* not rendered visually — keeps chapter changes announced, since the
+            panel the rail controls lives inside an iframe */}
+        <p className="demo-visually-hidden" aria-live="polite">
+          {caption}
+        </p>
       </div>
     </div>
   );
