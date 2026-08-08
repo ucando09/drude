@@ -1,4 +1,5 @@
 import Reveal from "../components/Reveal";
+import LiveDemo from "./LiveDemo";
 
 export default function Vision() {
   return (
@@ -22,27 +23,12 @@ export default function Vision() {
           </p>
         </Reveal>
 
-        <Reveal delay={0.1}>
-          <div className="parallel">
-            <div className="parallel-cell">
-              <span className="tag mono">Software · already happened</span>
-              <h4>Vibe coding collapsed the distance between an idea and a running app.</h4>
-              <p>
-                Millions of people who never called themselves programmers now describe
-                what they want and ship it the same afternoon.
-              </p>
-            </div>
-            <div className="parallel-cell next">
-              <span className="tag mono">Hardware · happening next</span>
-              <h4>P-say-B collapses the distance between an idea and a working board.</h4>
-              <p>
-                People who never called themselves engineers will describe a device and
-                hold it in their hands a week later.
-              </p>
-            </div>
-          </div>
-        </Reveal>
+      </div>
 
+      {/* sits outside .container so the screen can run wider than the text column */}
+      <LiveDemo />
+
+      <div className="container">
         <div className="vision-closer">
           <Reveal>
             <h2>

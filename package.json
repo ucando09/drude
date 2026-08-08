@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "sync:demo": "node scripts/sync-demo.mjs"
   },
   "dependencies": {
     "framer-motion": "^12.23.0",
