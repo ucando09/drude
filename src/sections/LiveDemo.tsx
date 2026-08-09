@@ -1,8 +1,6 @@
 import { useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import DemoFrame from "../components/DemoFrame";
-import DemoStory from "./DemoStory";
-import useMediaQuery from "../hooks/useMediaQuery";
 import { useI18n } from "../lib/i18n";
 import {
   CHAPTERS,
@@ -10,22 +8,16 @@ import {
   createDriver,
   type Bridge,
   type DriverPhase,
+  type LayoutMode,
 } from "../lib/demoBridge";
 
 /**
- * Below this the IDE cannot be scaled and stay legible — at 860px it computes to
- * roughly 6.5px text. The height clause catches short laptops (1280×800 lands at
- * 0.47). This is deliberately a JS constant, not the codebase's 860px CSS
- * breakpoint: `display: none` would still fetch and boot 133 KB of IDE.
+ * The real demo runs at every width. It is never swapped for a picture or a
+ * retelling: narrow viewports get the same iframe, laid out for the space they
+ * have — DemoFrame picks the logical viewport, and the bridge folds the mock's
+ * panes to match (see layoutModeFor).
  */
-const DEMO_VIEWPORT = "(min-width: 1024px) and (min-height: 620px)";
-
 export default function LiveDemo() {
-  const canRunDemo = useMediaQuery(DEMO_VIEWPORT);
-  return canRunDemo ? <LiveDemoDesktop /> : <DemoStory />;
-}
-
-function LiveDemoDesktop() {
   const { t } = useI18n();
   const rootRef = useRef<HTMLDivElement>(null);
   const railRef = useRef<HTMLDivElement>(null);
@@ -41,6 +33,14 @@ function LiveDemoDesktop() {
   const driverRef = useRef<ReturnType<typeof createDriver> | null>(null);
   const attachedRef = useRef<HTMLIFrameElement | null>(null);
 
+  /* DemoFrame measures the box, so the mode arrives from there — held in a ref
+     because the mock may finish booting either side of the first measurement. */
+  const modeRef = useRef<LayoutMode>("full");
+  const handleLayout = useCallback((mode: LayoutMode) => {
+    modeRef.current = mode;
+    bridgeRef.current?.setLayout(mode);
+  }, []);
+
   const handleLoaded = useCallback((iframe: HTMLIFrameElement) => {
     if (attachedRef.current === iframe) return;
     attachedRef.current = iframe;
@@ -48,6 +48,7 @@ function LiveDemoDesktop() {
     const bridge = createBridge(iframe);
     bridge.patchFocus();
     bridge.injectStyles();
+    bridge.setLayout(modeRef.current);
     bridge.openingLayout();
 
     bridgeRef.current = bridge;
@@ -141,7 +142,7 @@ function LiveDemoDesktop() {
 
   return (
     <div className="demo" id="demo" ref={rootRef}>
-      <DemoFrame live={live} onLoaded={handleLoaded} />
+      <DemoFrame live={live} onLoaded={handleLoaded} onLayout={handleLayout} />
 
       <div className="demo-dock">
         <div

@@ -93,7 +93,7 @@ Status legend: ✅ translated · ⬜ pending (shows English for now)
 | `footer.tag` | P-say-B — vibe-coding, for hardware. | | ⬜ |
 | `footer.copy` | © 2026 Drude. Seoul, KR. | | ⬜ |
 
-## Live demo (desktop) — rail labels & captions only
+## Live demo (all viewports) — rail labels & captions only
 
 The five prompts that get **typed into the embedded IDE mock must stay in English**
 — `public/demo/index.html` pattern-matches on English keywords (e.g. `/cocktail|pump|drink|bartend|robot/i`)
@@ -115,34 +115,6 @@ React-rendered chrome around it (rail button labels, the caption line) is transl
 | `demo.chapters.3.caption` | It quotes the job — then refuses to place the order. This is the whole point. | | ⬜ |
 | `demo.chapters.4.label` | Order | | ⬜ |
 | `demo.chapters.4.caption` | The clearance error clears, nothing else moves, and the button lights up. | | ⬜ |
-
-## Demo story (mobile/tablet fallback, <1024px)
-
-Fully static, React-rendered — safe to translate in full (unlike the live demo above).
-
-| Key | English | Korean | Status |
-|---|---|---|---|
-| `demoStory.beat1.title` | You describe the thing | | ⬜ |
-| `demoStory.beat1.bubble` | I'm building a cocktail robot. It drives four peristaltic pumps at 12 volts, talks over Wi-Fi, and needs a USB-C port for firmware. I'm a software developer, not a hardware person — pick sensible parts for me. | | ⬜ |
-| `demoStory.beat1.note` | No part numbers. No voltages you had to look up. | | ⬜ |
-| `demoStory.beat2.title` | It picks the parts | | ⬜ |
-| `demoStory.beat2.more` | + 10 more lines | | ⬜ |
-| `demoStory.beat2.note.strong1` | 52,418 parts | | ⬜ |
-| `demoStory.beat2.note.mid` | searched against live vendor stock. All 14 lines in stock, | | ⬜ |
-| `demoStory.beat2.note.strong2` | $18.62 | | ⬜ |
-| `demoStory.beat2.note.tail` | a board. Picking a chip that's out of stock for nine months is what actually kills hardware projects. | | ⬜ |
-| `demoStory.beat3.title` | It draws it and routes it | | ⬜ |
-| `demoStory.beat3.note.strong` | 96 nets | | ⬜ |
-| `demoStory.beat3.note.tail` | , all routed · 4 layers · 100 × 60 mm. The pump drivers sit along one edge sharing a copper pour, so they spread heat instead of cooking each other. | | ⬜ |
-| `demoStory.beat4.title` | Then it checks it and orders it | | ⬜ |
-| `demoStory.beat4.drc` | 1,800 design-rule checks · 0 errors | | ⬜ |
-| `demoStory.beat4.boards` | Boards | | ⬜ |
-| `demoStory.beat4.stack` | Stack | | ⬜ |
-| `demoStory.beat4.leadTime` | Lead time | | ⬜ |
-| `demoStory.beat4.total` | Total | | ⬜ |
-| `demoStory.beat4.order` | Order 5 boards · $28.40 | | ⬜ |
-| `demoStory.beat4.note` | Gerbers exported, every rule checked, and the job quoted with the factory. That's a real board on its way to be manufactured — from three sentences of English. | | ⬜ |
-| `demoStory.foot` | The live, playable demo runs on desktop | | ⬜ |
 
 ## Page metadata (browser tab title + SEO description)
 

@@ -19,9 +19,30 @@ type DemoWindow = Window &
     enterDraft?: (projectId: string) => void;
     switchTab?: (tab: string, reveal?: boolean) => void;
     setPane?: (which: "sidebar" | "canvas", open: boolean) => void;
+    setExpanded?: (on: boolean) => void;
     send?: () => void;
     toast?: (msg: string) => void;
   };
+
+/**
+ * How many of the mock's three panes fit side by side at the width it is being
+ * given. Its own grid is the source of these numbers:
+ * `246px | minmax(360px,1fr) | minmax(420px,1.15fr)`, with `.sb-collapsed`
+ * folding the sidebar to a 46px icon rail and `.cv-collapsed` removing the
+ * workspace panel entirely.
+ *
+ *  - `full`     1026px+ — all three, sidebar open. What the mock was drawn for.
+ *  - `compact`   826px+ — all three, sidebar folded to its rail.
+ *  - `stacked`   under  — one pane at a time; the driver swaps between the
+ *                         conversation and the workspace as the story moves.
+ */
+export type LayoutMode = "full" | "compact" | "stacked";
+
+export function layoutModeFor(logicalWidth: number): LayoutMode {
+  if (logicalWidth >= 1026) return "full";
+  if (logicalWidth >= 826) return "compact";
+  return "stacked";
+}
 
 export type Chapter = {
   id: string;
@@ -103,6 +124,7 @@ export function createBridge(iframe: HTMLIFrameElement) {
   const composer = () => doc()?.querySelector<HTMLTextAreaElement>("#input") ?? null;
 
   let originalFocus: ((options?: FocusOptions) => void) | null = null;
+  let mode: LayoutMode = "full";
 
   /**
    * The state we want the visitor to arrive at: workspace panel closed so the
@@ -114,7 +136,9 @@ export function createBridge(iframe: HTMLIFrameElement) {
    */
   function openingLayout() {
     doc()?.querySelector<HTMLElement>('#modeSeg .seg[data-mode="easy"]')?.click();
-    win()?.setPane?.("canvas", false);
+    const w = win();
+    w?.setPane?.("canvas", false); // also un-expands, in the mock's own setPane
+    w?.setPane?.("sidebar", mode === "full");
   }
 
   return {
@@ -200,9 +224,45 @@ export function createBridge(iframe: HTMLIFrameElement) {
 
     openingLayout,
 
+    /**
+     * Re-applies the pane rules for a new width. Only ever collapses: widening
+     * leaves the workspace panel closed until the next prompt opens it, which
+     * costs a beat but can never leave three panes crammed into a viewport that
+     * cannot hold them.
+     */
+    setLayout(next: LayoutMode) {
+      mode = next;
+      const w = win();
+      if (!w) return;
+      w.setPane?.("sidebar", next === "full");
+      if (next === "stacked") w.setPane?.("canvas", false);
+    },
+
+    /**
+     * Puts the conversation on screen before a prompt is typed into it. Only
+     * does anything when stacked, where the workspace panel is covering it.
+     */
+    composerLayout() {
+      if (mode === "stacked") win()?.setPane?.("canvas", false);
+    },
+
     /** Reveals the workspace panel — used the moment a prompt is sent. */
     showCanvas() {
-      win()?.setPane?.("canvas", true);
+      // stacked has no room to show it beside the reply, so it waits for
+      // resultLayout() instead and lets the visitor read the answer first
+      if (mode !== "stacked") win()?.setPane?.("canvas", true);
+    },
+
+    /**
+     * The payoff beat for a stacked viewport: once the reply has finished, the
+     * workspace panel takes the whole frame so the BOM, the schematic and the
+     * routed board are seen at full size rather than in a 40%-wide sliver.
+     */
+    resultLayout() {
+      if (mode !== "stacked") return;
+      const w = win();
+      w?.setPane?.("canvas", true);
+      w?.setExpanded?.(true);
     },
 
     hasComposer() {
@@ -327,6 +387,9 @@ export function createDriver(bridge: Bridge, events: DriverEvents) {
       if (!(await wait(280, mine))) return false;
     }
 
+    // on a stacked viewport the workspace panel is sitting over the composer
+    bridge.composerLayout();
+
     events.onPhase("typing", index);
     if (!(await type(chapter.prompt, mine))) return false;
     if (!(await wait(420, mine))) return false;
@@ -339,7 +402,10 @@ export function createDriver(bridge: Bridge, events: DriverEvents) {
     if (!(await until(() => bridge.busy(), mine, 3000))) {
       return mine === token; // never started streaming; don't hang the rail
     }
-    return until(() => !bridge.busy(), mine);
+
+    const finished = await until(() => !bridge.busy(), mine);
+    if (finished) bridge.resultLayout();
+    return finished;
   }
 
   function cancel() {
