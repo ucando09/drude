@@ -15,10 +15,18 @@ const I18nContext = createContext<I18nContextValue | null>(null);
 
 const STORAGE_KEY = "drude-lang";
 
+/** Falls back to the browser/OS language when the visitor has no stored preference yet. */
+function detectLanguage(): Language {
+  const candidates = navigator.languages?.length ? navigator.languages : [navigator.language];
+  return candidates.some((lang) => lang.toLowerCase().startsWith("ko")) ? "ko" : "en";
+}
+
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>(() => {
     if (typeof window === "undefined") return "en";
-    return window.localStorage.getItem(STORAGE_KEY) === "ko" ? "ko" : "en";
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (stored === "ko" || stored === "en") return stored;
+    return detectLanguage();
   });
 
   useEffect(() => {
