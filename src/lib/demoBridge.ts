@@ -190,6 +190,25 @@ export function createBridge(iframe: HTMLIFrameElement) {
      *
      * Also contains overscroll so the thread / BOM / sidebar scrollers stop
      * chaining into the page when they hit their ends.
+     *
+     * And it repairs the mock's own narrow-viewport rule. The mock ships:
+     *
+     *     @media (max-width:1200px){ .body{grid-template-columns:210px 1fr 1fr} }
+     *
+     * which hard-codes three tracks with no var(--c1/--c2/--c3), so below
+     * 1200px the collapse classes stop moving the columns: a closed workspace
+     * panel is display:none but its 1fr track still holds the space, leaving a
+     * dead band down the side of the frame. That rule never used to fire — the
+     * frame was always 1600px wide — and it does now that the app is given the
+     * width it actually has. Same declaration, variables put back, and later in
+     * the cascade so it wins. minmax(0,1fr) rather than the desktop rule's 360
+     * and 420 minimums, since at these widths those are what overflow.
+     *
+     * The expanded state needs one track rather than three zeroed ones for the
+     * same reason the mock's own ⤢ is subtly wrong: it hides the other two
+     * panes with display:none, which stops them being grid items at all, so the
+     * workspace panel auto-places into the *first* column — the one the state
+     * sets to 0px — and renders at zero width.
      */
     injectStyles() {
       const d = doc();
@@ -201,7 +220,11 @@ export function createBridge(iframe: HTMLIFrameElement) {
 
       const style = d.createElement("style");
       style.id = "drude-demo-patch";
-      style.textContent = "html,body{overscroll-behavior:contain}";
+      style.textContent = `html,body{overscroll-behavior:contain}
+@media (max-width:1200px){
+  .body{grid-template-columns:var(--c1,210px) var(--c2,minmax(0,1fr)) var(--c3,minmax(0,1fr))}
+}
+.body.cv-expanded{grid-template-columns:1fr}`;
       d.head.appendChild(style);
     },
 
