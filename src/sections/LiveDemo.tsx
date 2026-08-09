@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import DemoFrame from "../components/DemoFrame";
 import DemoStory from "./DemoStory";
 import useMediaQuery from "../hooks/useMediaQuery";
+import { useI18n } from "../lib/i18n";
 import {
   CHAPTERS,
   createBridge,
@@ -25,6 +26,7 @@ export default function LiveDemo() {
 }
 
 function LiveDemoDesktop() {
+  const { t } = useI18n();
   const rootRef = useRef<HTMLDivElement>(null);
   const railRef = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion() ?? false;
@@ -129,10 +131,13 @@ function LiveDemoDesktop() {
 
   const caption =
     phase === "waiting"
-      ? "Letting the current reply finish…"
+      ? t("demo.waitingCaption", "Letting the current reply finish…")
       : active >= 0
-        ? CHAPTERS[active].caption
-        : "One sentence of English to a board on its way to the fab, in five steps.";
+        ? t(`demo.chapters.${active}.caption`, CHAPTERS[active].caption)
+        : t(
+            "demo.defaultCaption",
+            "One sentence of English to a board on its way to the fab, in five steps.",
+          );
 
   return (
     <div className="demo" id="demo" ref={rootRef}>
@@ -142,7 +147,7 @@ function LiveDemoDesktop() {
         <div
           className="demo-rail"
           role="tablist"
-          aria-label="Demo chapters"
+          aria-label={t("demo.railLabel", "Demo chapters")}
           ref={railRef}
           onKeyDown={onRailKeys}
         >
@@ -160,7 +165,7 @@ function LiveDemoDesktop() {
               onClick={() => playFrom(index)}
             >
               <span className="demo-chip-idx">{index + 1}</span>
-              {chapter.label}
+              {t(`demo.chapters.${index}.label`, chapter.label)}
             </button>
           ))}
         </div>

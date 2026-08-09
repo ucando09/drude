@@ -2,6 +2,7 @@ import { motion, useScroll, useSpring, useTransform } from "framer-motion";
 import type { MotionValue } from "framer-motion";
 import { useRef } from "react";
 import type { ReactNode } from "react";
+import { useI18n } from "../lib/i18n";
 
 /* ------------------------------------------------------------------ */
 /* Scroll choreography (p = 0..1 across the 640vh pinned section)      */
@@ -82,12 +83,15 @@ function FabPart({ p, i, children }: { p: MotionValue<number>; i: number; childr
 function StepCard({
   p,
   step,
+  index,
   isLast,
 }: {
   p: MotionValue<number>;
   step: (typeof STEPS)[number];
+  index: number;
   isLast: boolean;
 }) {
+  const { t } = useI18n();
   const [a, b] = step.range;
   const op = useTransform(
     p,
@@ -99,8 +103,8 @@ function StepCard({
     <div className="step-card">
       <motion.div style={{ opacity: op, y }}>
         <span className="idx mono">{step.idx}</span>
-        <h3>{step.title}</h3>
-        <p>{step.body}</p>
+        <h3>{t(`scene.steps.${index}.title`, step.title)}</h3>
+        <p>{t(`scene.steps.${index}.body`, step.body)}</p>
       </motion.div>
     </div>
   );
@@ -216,6 +220,7 @@ function ProcessBoard({ p }: { p: MotionValue<number> }) {
 }
 
 export default function PhoneScene() {
+  const { t } = useI18n();
   const ref = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
   const p = useSpring(scrollYProgress, { stiffness: 120, damping: 28, restDelta: 0.0005 });
@@ -242,10 +247,10 @@ export default function PhoneScene() {
     <section className="scene" ref={ref}>
       <div className="scene-sticky">
         <motion.p className="scene-kicker mono" style={{ opacity: kicker1Op }}>
-          Every device you own is three layers deep
+          {t("scene.kicker1", "Every device you own is three layers deep")}
         </motion.p>
         <motion.p className="scene-kicker mono" style={{ opacity: kicker2Op }}>
-          How the hardware layer gets made — today
+          {t("scene.kicker2", "How the hardware layer gets made — today")}
         </motion.p>
 
         <motion.div className="scene-shadow" style={{ opacity: shadowOp }} />
@@ -293,10 +298,10 @@ export default function PhoneScene() {
               <motion.div className="phone-layer layer-glass" style={{ z: gap, opacity: sideOp }}>
                 <div className="glass-notch" />
                 <div className="glass-prompt">
-                  <span className="p-accent">›</span> drude — new project_
+                  <span className="p-accent">›</span> {t("scene.glass.prompt", "drude — new project_")}
                 </div>
                 <div className="glass-bubble">
-                  build me a heart-rate wearable. battery first, tiny, matte.
+                  {t("scene.glass.bubble", "build me a heart-rate wearable. battery first, tiny, matte.")}
                 </div>
                 <div className="glass-skeleton">
                   <i style={{ width: "88%" }} />
@@ -310,11 +315,11 @@ export default function PhoneScene() {
         </div>
 
         <div className="layer-labels">
-          {LABELS.map((l) => (
+          {LABELS.map((l, i) => (
             <motion.div className="layer-label" key={l.idx} style={{ opacity: labelsOp, x: labelsX }}>
               <span className="idx">{l.idx}</span>
-              <span className="name">{l.name}</span>
-              <span className="desc">{l.desc}</span>
+              <span className="name">{t(`scene.labels.${i}.name`, l.name)}</span>
+              <span className="desc">{t(`scene.labels.${i}.desc`, l.desc)}</span>
             </motion.div>
           ))}
         </div>
@@ -327,7 +332,7 @@ export default function PhoneScene() {
 
         <div className="step-col">
           {STEPS.map((s, i) => (
-            <StepCard key={s.idx} p={p} step={s} isLast={i === STEPS.length - 1} />
+            <StepCard key={s.idx} p={p} step={s} index={i} isLast={i === STEPS.length - 1} />
           ))}
         </div>
       </div>

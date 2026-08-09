@@ -1,4 +1,5 @@
 import Reveal from "../components/Reveal";
+import { useI18n } from "../lib/i18n";
 
 const FOUNDERS = [
   {
@@ -26,13 +27,20 @@ const FOUNDERS = [
 ];
 
 export default function Founders() {
+  const { t } = useI18n();
+
   return (
     <section className="founders">
       <div className="container">
         <div className="founders-head">
           <Reveal>
-            <span className="mono">The team</span>
-            <h2>Built by two people who got tired of waiting for hardware.</h2>
+            <span className="mono">{t("founders.kicker", "The team")}</span>
+            <h2>
+              {t(
+                "founders.heading",
+                "Built by two people who got tired of waiting for hardware.",
+              )}
+            </h2>
           </Reveal>
         </div>
         <div className="founder-grid">
@@ -42,14 +50,15 @@ export default function Founders() {
                 <div className="founder-top">
                   <div className="founder-avatar">{f.initials}</div>
                   <div>
-                    <div className="founder-name">{f.name}</div>
-                    <div className="founder-role">{f.role}</div>
+                    <div className="founder-name">{t(`founders.${i}.name`, f.name)}</div>
+                    <div className="founder-role">{t(`founders.${i}.role`, f.role)}</div>
                   </div>
                 </div>
                 <ul className="founder-lines">
-                  {f.lines.map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
+                  {f.lines.map((line, j) => {
+                    const text = t(`founders.${i}.lines.${j}`, line);
+                    return text ? <li key={line}>{text}</li> : null;
+                  })}
                 </ul>
               </div>
             </Reveal>

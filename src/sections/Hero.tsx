@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useI18n } from "../lib/i18n";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -18,6 +19,8 @@ function MaskedLine({ children, delay }: { children: React.ReactNode; delay: num
 }
 
 export default function Hero() {
+  const { language, t } = useI18n();
+
   return (
     <section className="hero">
       <div className="hero-inner">
@@ -27,13 +30,14 @@ export default function Hero() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.15 }}
         >
-          Drude introduces P-say-B <span className="cursor" />
+          {t("hero.kicker", "Drude introduces P-say-B")} <span className="cursor" />
         </motion.p>
 
         <h1>
-          <MaskedLine delay={0.25}>Vibe-coding,</MaskedLine>
+          <MaskedLine delay={0.25}>{t("hero.title.line1", "Vibe-coding,")}</MaskedLine>
           <MaskedLine delay={0.38}>
-            for <span className="serif-i">hardware.</span>
+            {t("hero.title.line2.prefix", "for ")}
+            <span className="serif-i">{t("hero.title.line2.em", "hardware.")}</span>
           </MaskedLine>
         </h1>
 
@@ -43,9 +47,15 @@ export default function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.9, delay: 0.7, ease: EASE }}
         >
-          Describe the device you want. <strong>P-say-B</strong> plans the board, draws
-          the schematic, routes the layout, and hands it to the fab.{" "}
-          <strong>English in, hardware out.</strong>
+          {language === "ko" ? (
+            t("hero.sub", "")
+          ) : (
+            <>
+              Describe the device you want. <strong>P-say-B</strong> plans the board, draws
+              the schematic, routes the layout, and hands it to the fab.{" "}
+              <strong>English in, hardware out.</strong>
+            </>
+          )}
         </motion.p>
       </div>
 
@@ -55,7 +65,7 @@ export default function Hero() {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.8, delay: 1.3 }}
       >
-        <span className="mono">Scroll</span>
+        <span className="mono">{t("hero.scroll", "Scroll")}</span>
         <span className="track" />
       </motion.div>
     </section>

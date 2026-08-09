@@ -27,6 +27,12 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Browsers default to breaking Hangul at any syllable — keep-all makes line
+   wraps respect spaces, same as Latin text. */
+html[lang="ko"] {
+  word-break: keep-all;
+}
+
 body {
   background: var(--bg);
   color: var(--ink);
@@ -133,6 +139,35 @@ a {
   color: var(--ink);
 }
 
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.nav-lang {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.nav-lang span {
+  transition: color 0.25s;
+}
+
+.nav-lang span.on {
+  color: var(--ink);
+}
+
+.nav-lang:hover span {
+  color: var(--ink);
+}
+
 /* ---------- hero ---------- */
 
 .hero {
@@ -188,6 +223,12 @@ a {
   font-size: clamp(3.2rem, 9.5vw, 8.2rem);
   line-height: 0.99;
   letter-spacing: -0.045em;
+}
+
+/* Hangul syllable blocks sit taller than Latin glyphs, so the 0.99 line-height
+   tuned for the English comma's descender makes stacked lines collide. */
+html[lang="ko"] .hero h1 {
+  line-height: 1.18;
 }
 
 .hero h1 .serif-i {
@@ -597,6 +638,12 @@ a {
   font-size: clamp(2.4rem, 6vw, 5rem);
   letter-spacing: -0.04em;
   line-height: 1.05;
+}
+
+/* Same fix as the hero: Hangul sits taller than Latin, so the tight Latin
+   line-height makes the comma on line 1 collide with line 2 below it. */
+html[lang="ko"] .vision-closer h2 {
+  line-height: 1.2;
 }
 
 .vision-closer .serif-i {

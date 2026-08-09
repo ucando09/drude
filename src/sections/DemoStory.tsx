@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Reveal from "../components/Reveal";
+import { useI18n } from "../lib/i18n";
 
 /**
  * Small-viewport stand-in for the live demo. The real app is a 3-pane desktop
@@ -40,20 +41,29 @@ function Beat({
 }
 
 export default function DemoStory() {
+  const { t } = useI18n();
+
   return (
     <div className="demo-story" id="demo">
       <div className="container">
         <div className="story-beats">
-          <Beat index={1} delay={0} title="You describe the thing">
+          <Beat
+            index={1}
+            delay={0}
+            title={t("demoStory.beat1.title", "You describe the thing")}
+          >
             <p className="story-bubble">
-              I'm building a cocktail robot. It drives four peristaltic pumps at 12 volts, talks
-              over Wi-Fi, and needs a USB-C port for firmware. I'm a software developer, not a
-              hardware person — pick sensible parts for me.
+              {t(
+                "demoStory.beat1.bubble",
+                "I'm building a cocktail robot. It drives four peristaltic pumps at 12 volts, talks over Wi-Fi, and needs a USB-C port for firmware. I'm a software developer, not a hardware person — pick sensible parts for me.",
+              )}
             </p>
-            <p className="story-note">No part numbers. No voltages you had to look up.</p>
+            <p className="story-note">
+              {t("demoStory.beat1.note", "No part numbers. No voltages you had to look up.")}
+            </p>
           </Beat>
 
-          <Beat index={2} delay={0.06} title="It picks the parts">
+          <Beat index={2} delay={0.06} title={t("demoStory.beat2.title", "It picks the parts")}>
             <table className="story-bom">
               <tbody>
                 {BOM.map((row) => (
@@ -68,18 +78,26 @@ export default function DemoStory() {
                   </tr>
                 ))}
                 <tr className="story-bom-more">
-                  <td colSpan={4}>+ 10 more lines</td>
+                  <td colSpan={4}>{t("demoStory.beat2.more", "+ 10 more lines")}</td>
                 </tr>
               </tbody>
             </table>
             <p className="story-note">
-              <strong>52,418 parts</strong> searched against live vendor stock. All 14 lines in
-              stock, <strong>$18.62</strong> a board. Picking a chip that's out of stock for nine
-              months is what actually kills hardware projects.
+              <strong>{t("demoStory.beat2.note.strong1", "52,418 parts")}</strong>{" "}
+              {t("demoStory.beat2.note.mid", "searched against live vendor stock. All 14 lines in stock,")}{" "}
+              <strong>{t("demoStory.beat2.note.strong2", "$18.62")}</strong>{" "}
+              {t(
+                "demoStory.beat2.note.tail",
+                "a board. Picking a chip that's out of stock for nine months is what actually kills hardware projects.",
+              )}
             </p>
           </Beat>
 
-          <Beat index={3} delay={0.06} title="It draws it and routes it">
+          <Beat
+            index={3}
+            delay={0.06}
+            title={t("demoStory.beat3.title", "It draws it and routes it")}
+          >
             <div className="story-board">
               <svg viewBox="0 0 300 180" fill="none" role="img" aria-label="Routed circuit board">
                 <rect x="2" y="2" width="296" height="176" rx="10" fill="#2b4bff" />
@@ -120,47 +138,59 @@ export default function DemoStory() {
               </svg>
             </div>
             <p className="story-note">
-              <strong>96 nets</strong>, all routed · 4 layers · 100 × 60 mm. The pump drivers sit
-              along one edge sharing a copper pour, so they spread heat instead of cooking each
-              other.
+              <strong>{t("demoStory.beat3.note.strong", "96 nets")}</strong>
+              {t(
+                "demoStory.beat3.note.tail",
+                ", all routed · 4 layers · 100 × 60 mm. The pump drivers sit along one edge sharing a copper pour, so they spread heat instead of cooking each other.",
+              )}
             </p>
           </Beat>
 
-          <Beat index={4} delay={0.06} title="Then it checks it and orders it">
+          <Beat
+            index={4}
+            delay={0.06}
+            title={t("demoStory.beat4.title", "Then it checks it and orders it")}
+          >
             <div className="story-pass">
               <span className="story-pass-dot" aria-hidden="true" />
-              <p className="mono">1,800 design-rule checks · 0 errors</p>
+              <p className="mono">
+                {t("demoStory.beat4.drc", "1,800 design-rule checks · 0 errors")}
+              </p>
             </div>
             <dl className="story-quote">
               <div>
-                <dt className="mono">Boards</dt>
+                <dt className="mono">{t("demoStory.beat4.boards", "Boards")}</dt>
                 <dd>5</dd>
               </div>
               <div>
-                <dt className="mono">Stack</dt>
+                <dt className="mono">{t("demoStory.beat4.stack", "Stack")}</dt>
                 <dd>4 layer</dd>
               </div>
               <div>
-                <dt className="mono">Lead time</dt>
+                <dt className="mono">{t("demoStory.beat4.leadTime", "Lead time")}</dt>
                 <dd>3 days</dd>
               </div>
               <div>
-                <dt className="mono">Total</dt>
+                <dt className="mono">{t("demoStory.beat4.total", "Total")}</dt>
                 <dd>$28.40</dd>
               </div>
             </dl>
             <button className="story-order" type="button">
-              Order 5 boards · $28.40
+              {t("demoStory.beat4.order", "Order 5 boards · $28.40")}
             </button>
             <p className="story-note">
-              Gerbers exported, every rule checked, and the job quoted with the factory. That's a
-              real board on its way to be manufactured — from three sentences of English.
+              {t(
+                "demoStory.beat4.note",
+                "Gerbers exported, every rule checked, and the job quoted with the factory. That's a real board on its way to be manufactured — from three sentences of English.",
+              )}
             </p>
           </Beat>
         </div>
 
         <Reveal delay={0.1}>
-          <p className="story-foot mono">The live, playable demo runs on desktop</p>
+          <p className="story-foot mono">
+            {t("demoStory.foot", "The live, playable demo runs on desktop")}
+          </p>
         </Reveal>
       </div>
     </div>
