@@ -45,6 +45,10 @@ export default function LiveDemo() {
     if (attachedRef.current === iframe) return;
     attachedRef.current = iframe;
 
+    /* A different element means DemoFrame replaced a frame that had died, so
+       the old driver is still counting down against a window that is gone. */
+    driverRef.current?.cancel();
+
     const bridge = createBridge(iframe);
     bridge.patchFocus();
     bridge.injectStyles();
