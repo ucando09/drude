@@ -25,6 +25,10 @@ export default function LiveDemo() {
 
   const [inView, setInView] = useState(false);
   const [ready, setReady] = useState(false);
+  /* Counts frames attached, not just the first. `ready` latches true and stays
+     there, so on its own it cannot restart the walkthrough for a replacement
+     frame — this is what the start effect watches instead. */
+  const [generation, setGeneration] = useState(0);
   const [phase, setPhase] = useState<DriverPhase>("idle");
   const [active, setActive] = useState(-1);
   const [done, setDone] = useState<number[]>([]);
@@ -66,7 +70,13 @@ export default function LiveDemo() {
       onLoop: () => setDone([]),
     });
 
+    /* A replacement frame starts the story from scratch, so the rail must not
+       keep showing the chapter the dead one had reached. */
+    setPhase("idle");
+    setActive(-1);
+    setDone([]);
     setReady(true);
+    setGeneration((n) => n + 1);
   }, []);
 
   const playFrom = useCallback((index: number) => {
@@ -115,7 +125,7 @@ export default function LiveDemo() {
       playFrom(0);
     }, 500);
     return () => clearTimeout(timer);
-  }, [inView, ready, reduced, playFrom]);
+  }, [inView, ready, reduced, playFrom, generation]);
 
   useEffect(
     () => () => {

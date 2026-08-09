@@ -166,11 +166,17 @@ export default function DemoFrame({ live, onLoaded, onLayout }: Props) {
      boot is not reloaded forever. */
   useEffect(() => {
     if (!src || attempt >= MAX_RELOADS) return;
+    let misses = 0;
     const id = window.setInterval(() => {
       const iframe = iframeRef.current;
       if (!bootedRef.current || !iframe) return;
       const doc = iframe.contentDocument;
-      if (doc && doc.getElementById("btnSend")) return;
+      if (doc && doc.getElementById("btnSend")) {
+        misses = 0;
+        return;
+      }
+      // one miss can be a navigation in flight; a dead frame stays dead
+      if ((misses += 1) < 2) return;
       bootedRef.current = false;
       setAttempt((n) => n + 1);
     }, 2000);
