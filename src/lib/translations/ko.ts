@@ -34,7 +34,7 @@ export const ko: Record<string, string> = {
   "vision.closer.heading.line1": "이제 누구나 자신만의 기기를,",
   "vision.closer.heading.line2": "각자의 취향대로 만들게 됩니다.",
   "vision.closer.body":
-    "진열대에서 골라 쓰는 게 아니라, 수백만 명에 맞춰 타협하지도 않습니다. 소프트웨어가 이미 그렇듯, 단 한 사람 — 바로 당신 — 을 위해 설계됩니다.",
+    "진열대에서 골라 쓰지도, 수백만 명에 맞춰 타협하지도 않습니다. 소프트웨어가 이미 그렇듯, 단 한 사람 — 바로 당신 — 을 위해 설계됩니다.",
 
   "founders.heading": "하드웨어의 손쉬운 제작을 위한 마음으로 모인 팀",
   "founders.0.name": "장진호",
