@@ -65,7 +65,7 @@ Status legend: ✅ translated · ⬜ pending (shows English for now)
 | `vision.lede.suffix` | . What takes a hardware team weeks becomes a conversation. | . 하드웨어 팀이 몇 주를 쓰던 일이, 대화 한 번으로 됩니다. | ✅ |
 | `vision.closer.heading.line1` | Everyone will build their own devices, | 이제 누구나 자신만의 기기를, | ✅ *(Claude-drafted, by request)* |
 | `vision.closer.heading.line2` | to their own taste. | 각자의 취향대로 만들게 됩니다. | ✅ *(Claude-drafted, by request)* |
-| `vision.closer.body` | Not picked off a shelf. Not compromised to fit a market of millions. Designed for a market of one — you — the way software already is. | 진열대에서 골라 쓰는 게 아니라, 수백만 명에 맞춰 타협하지도 않습니다. 소프트웨어가 이미 그렇듯, 단 한 사람 — 바로 당신 — 을 위해 설계됩니다. | ✅ *(Claude-drafted, by request)* |
+| `vision.closer.body` | Not picked off a shelf. Not compromised to fit a market of millions. Designed for a market of one — you — the way software already is. | 진열대에서 골라 쓰는 것도, 수백만 명에 맞춰 타협하지도 않습니다. 소프트웨어가 이미 그렇듯, 단 한 사람 — 바로 당신 — 을 위해 설계됩니다. | ✅ *(Claude-drafted, by request)* |
 
 ## Founders
 
