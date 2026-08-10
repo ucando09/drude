@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import DemoFrame from "../components/DemoFrame";
 import DemoStory from "./DemoStory";
 import useMediaQuery from "../hooks/useMediaQuery";
-import { useI18n } from "../lib/i18n";
+import { useI18n, type Language } from "../lib/i18n";
 import {
   CHAPTERS,
   createBridge,
@@ -22,10 +22,15 @@ const DEMO_VIEWPORT = "(min-width: 1024px) and (min-height: 620px)";
 
 export default function LiveDemo() {
   const canRunDemo = useMediaQuery(DEMO_VIEWPORT);
-  return canRunDemo ? <LiveDemoDesktop /> : <DemoStory />;
+  const { language } = useI18n();
+  /* Keyed on language so switching EN/KO fully remounts the demo — the mock is
+     a different static file per language (see DemoFrame's demoSrcFor), and a
+     live src swap on an already-loaded iframe wouldn't re-fire onLoaded on the
+     same DOM node, leaving the driver bound to the old document. */
+  return canRunDemo ? <LiveDemoDesktop key={language} language={language} /> : <DemoStory />;
 }
 
-function LiveDemoDesktop() {
+function LiveDemoDesktop({ language }: { language: Language }) {
   const { t } = useI18n();
   const rootRef = useRef<HTMLDivElement>(null);
   const railRef = useRef<HTMLDivElement>(null);
@@ -141,7 +146,7 @@ function LiveDemoDesktop() {
 
   return (
     <div className="demo" id="demo" ref={rootRef}>
-      <DemoFrame live={live} onLoaded={handleLoaded} />
+      <DemoFrame live={live} language={language} onLoaded={handleLoaded} />
 
       <div className="demo-dock">
         <div

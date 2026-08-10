@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { Language } from "../lib/i18n";
 
 /**
  * The IDE's 3-pane grid needs ~1026px before it gets cramped and is drawn for
@@ -9,15 +10,25 @@ import { useEffect, useRef, useState } from "react";
 const LOGICAL_W = 1600;
 const LOGICAL_H = 900;
 
-/** public/ files get no content hash — bump ?v= after `npm run sync:demo`. */
-const DEMO_SRC = `${import.meta.env.BASE_URL}demo/index.html?v=2`;
+/**
+ * public/ files get no content hash — bump ?v= after `npm run sync:demo`.
+ * index.ko.html is a hand-translated fork of index.html (chat text, sidebar,
+ * workspace panel — see public/demo/index.ko.html's own header comment). It is
+ * NOT touched by sync:demo, so re-syncing the English mock does not silently
+ * revert the Korean copy; re-translating after a source change is a manual step.
+ */
+function demoSrcFor(language: Language) {
+  const file = language === "ko" ? "index.ko.html" : "index.html";
+  return `${import.meta.env.BASE_URL}demo/${file}?v=2`;
+}
 
 type Props = {
   live: boolean;
+  language: Language;
   onLoaded: (iframe: HTMLIFrameElement) => void;
 };
 
-export default function DemoFrame({ live, onLoaded }: Props) {
+export default function DemoFrame({ live, language, onLoaded }: Props) {
   const windowRef = useRef<HTMLDivElement>(null);
   const fitRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -32,7 +43,7 @@ export default function DemoFrame({ live, onLoaded }: Props) {
     const io = new IntersectionObserver(
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) {
-          setSrc(DEMO_SRC);
+          setSrc(demoSrcFor(language));
           io.disconnect();
         }
       },
@@ -40,7 +51,7 @@ export default function DemoFrame({ live, onLoaded }: Props) {
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [src]);
+  }, [src, language]);
 
   /* CSS owns the box, JS owns only the scalar. Changing --s only changes a
      transform, which does not affect layout — so this can never feed back into
@@ -93,7 +104,11 @@ export default function DemoFrame({ live, onLoaded }: Props) {
             ref={iframeRef}
             className="demo-iframe"
             src={src}
-            title="P-say-B — live interactive product demo"
+            title={
+              language === "ko"
+                ? "P-say-B — 라이브 인터랙티브 제품 데모"
+                : "P-say-B — live interactive product demo"
+            }
             loading="lazy"
             width={LOGICAL_W}
             height={LOGICAL_H}

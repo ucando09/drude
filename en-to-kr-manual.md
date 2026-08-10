@@ -93,28 +93,38 @@ Status legend: ✅ translated · ⬜ pending (shows English for now)
 | `footer.tag` | P-say-B — vibe-coding, for hardware. | | ⬜ |
 | `footer.copy` | © 2026 Drude. Seoul, KR. | | ⬜ |
 
-## Live demo (desktop) — rail labels & captions only
+## Live demo (desktop)
 
-The five prompts that get **typed into the embedded IDE mock must stay in English**
-— `public/demo/index.html` pattern-matches on English keywords (e.g. `/cocktail|pump|drink|bartend|robot/i`)
-to decide what to show, so a Korean prompt would silently break the demo. Only the
-React-rendered chrome around it (rail button labels, the caption line) is translatable.
+The demo mock itself is now bilingual: `public/demo/index.ko.html` is a hand-translated
+fork of `public/demo/index.html` (chat text, sidebar folder/session names, the Plan/
+Schematic/Layout/Fab workspace panel — both Skilled and Easy modes). `DemoFrame`
+picks between the two based on `useI18n().language`; `LiveDemo` remounts the whole
+desktop demo (`key={language}`) on toggle so the iframe reloads with the right file.
+
+The five prompts that get **typed into the embedded IDE mock stay in English in both
+files** — the mock pattern-matches on English keywords (e.g. `/cocktail|pump|drink|bartend|robot/i`)
+to decide which canned reply to show, so a Korean prompt would silently pick the wrong
+reply. `sync:demo` only ever touches `index.html`; re-translating `index.ko.html` after
+a source-mock change is a manual step (see the comment at the top of that file).
+
+The rail chrome around the iframe (button labels, the caption line) is separately
+translated below, same as any other React-rendered copy.
 
 | Key | English | Korean | Status |
 |---|---|---|---|
-| `demo.railLabel` | Demo chapters (aria-label, not visible) | | ⬜ |
-| `demo.defaultCaption` | One sentence of English to a board on its way to the fab, in five steps. | | ⬜ |
-| `demo.waitingCaption` | Letting the current reply finish… | | ⬜ |
-| `demo.chapters.0.label` | Plan | | ⬜ |
-| `demo.chapters.0.caption` | No part numbers, no voltages looked up. Just what the thing does. | | ⬜ |
-| `demo.chapters.1.label` | Schematic | | ⬜ |
-| `demo.chapters.1.caption` | A regulator section lifted from a board that has actually been built. | | ⬜ |
-| `demo.chapters.2.label` | Layout | | ⬜ |
-| `demo.chapters.2.caption` | 96 nets, all routed. Placement is a vision problem, so this model is ours. | | ⬜ |
-| `demo.chapters.3.label` | Fab | | ⬜ |
-| `demo.chapters.3.caption` | It quotes the job — then refuses to place the order. This is the whole point. | | ⬜ |
-| `demo.chapters.4.label` | Order | | ⬜ |
-| `demo.chapters.4.caption` | The clearance error clears, nothing else moves, and the button lights up. | | ⬜ |
+| `demo.railLabel` | Demo chapters (aria-label, not visible) | 데모 챕터 | ✅ |
+| `demo.defaultCaption` | One sentence of English to a board on its way to the fab, in five steps. | 문장 하나로 다섯 단계를 거쳐, 제작 단계로 향하는 기판까지. | ✅ |
+| `demo.waitingCaption` | Letting the current reply finish… | 현재 답변이 끝나길 기다리는 중… | ✅ |
+| `demo.chapters.0.label` | Plan | 기획 | ✅ |
+| `demo.chapters.0.caption` | No part numbers, no voltages looked up. Just what the thing does. | 부품 번호도, 전압 확인도 필요 없이 — 무엇을 만들고 싶은지만 말하면 됩니다. | ✅ |
+| `demo.chapters.1.label` | Schematic | 회로도 | ✅ |
+| `demo.chapters.1.caption` | A regulator section lifted from a board that has actually been built. | 실제로 만들어져 검증된 보드에서 그대로 가져온 레귤레이터 회로. | ✅ |
+| `demo.chapters.2.label` | Layout | 레이아웃 | ✅ |
+| `demo.chapters.2.caption` | 96 nets, all routed. Placement is a vision problem, so this model is ours. | 96개 net을 모두 배선. 배치는 비전 문제라, 자체 모델이 직접 처리합니다. | ✅ |
+| `demo.chapters.3.label` | Fab | 제작 | ✅ |
+| `demo.chapters.3.caption` | It quotes the job — then refuses to place the order. This is the whole point. | 견적은 내주지만 — 주문은 거부합니다. 바로 이게 핵심입니다. | ✅ |
+| `demo.chapters.4.label` | Order | 주문 | ✅ |
+| `demo.chapters.4.caption` | The clearance error clears, nothing else moves, and the button lights up. | 간격 오류가 해결되고, 다른 건 그대로인 채 버튼에 불이 들어옵니다. | ✅ |
 
 ## Demo story (mobile/tablet fallback, <1024px)
 
@@ -122,27 +132,27 @@ Fully static, React-rendered — safe to translate in full (unlike the live demo
 
 | Key | English | Korean | Status |
 |---|---|---|---|
-| `demoStory.beat1.title` | You describe the thing | | ⬜ |
-| `demoStory.beat1.bubble` | I'm building a cocktail robot. It drives four peristaltic pumps at 12 volts, talks over Wi-Fi, and needs a USB-C port for firmware. I'm a software developer, not a hardware person — pick sensible parts for me. | | ⬜ |
-| `demoStory.beat1.note` | No part numbers. No voltages you had to look up. | | ⬜ |
-| `demoStory.beat2.title` | It picks the parts | | ⬜ |
-| `demoStory.beat2.more` | + 10 more lines | | ⬜ |
-| `demoStory.beat2.note.strong1` | 52,418 parts | | ⬜ |
-| `demoStory.beat2.note.mid` | searched against live vendor stock. All 14 lines in stock, | | ⬜ |
-| `demoStory.beat2.note.strong2` | $18.62 | | ⬜ |
-| `demoStory.beat2.note.tail` | a board. Picking a chip that's out of stock for nine months is what actually kills hardware projects. | | ⬜ |
-| `demoStory.beat3.title` | It draws it and routes it | | ⬜ |
-| `demoStory.beat3.note.strong` | 96 nets | | ⬜ |
-| `demoStory.beat3.note.tail` | , all routed · 4 layers · 100 × 60 mm. The pump drivers sit along one edge sharing a copper pour, so they spread heat instead of cooking each other. | | ⬜ |
-| `demoStory.beat4.title` | Then it checks it and orders it | | ⬜ |
-| `demoStory.beat4.drc` | 1,800 design-rule checks · 0 errors | | ⬜ |
-| `demoStory.beat4.boards` | Boards | | ⬜ |
-| `demoStory.beat4.stack` | Stack | | ⬜ |
-| `demoStory.beat4.leadTime` | Lead time | | ⬜ |
-| `demoStory.beat4.total` | Total | | ⬜ |
-| `demoStory.beat4.order` | Order 5 boards · $28.40 | | ⬜ |
-| `demoStory.beat4.note` | Gerbers exported, every rule checked, and the job quoted with the factory. That's a real board on its way to be manufactured — from three sentences of English. | | ⬜ |
-| `demoStory.foot` | The live, playable demo runs on desktop | | ⬜ |
+| `demoStory.beat1.title` | You describe the thing | 원하는 것을 설명하면 | ✅ |
+| `demoStory.beat1.bubble` | I'm building a cocktail robot. It drives four peristaltic pumps at 12 volts, talks over Wi-Fi, and needs a USB-C port for firmware. I'm a software developer, not a hardware person — pick sensible parts for me. | 칵테일 로봇을 만들고 있어요. 12볼트 연동 펌프 4개를 구동하고, Wi-Fi로 통신하고, 펌웨어용 USB-C 포트가 필요해요. 저는 소프트웨어 개발자라 하드웨어는 잘 몰라요 — 적당한 부품을 골라주세요. | ✅ |
+| `demoStory.beat1.note` | No part numbers. No voltages you had to look up. | 부품 번호도, 직접 찾아봐야 할 전압도 없습니다. | ✅ |
+| `demoStory.beat2.title` | It picks the parts | 부품을 골라줍니다 | ✅ |
+| `demoStory.beat2.more` | + 10 more lines | + 10개 항목 더 | ✅ |
+| `demoStory.beat2.note.strong1` | 52,418 parts | 52,418개 부품을 | ✅ |
+| `demoStory.beat2.note.mid` | searched against live vendor stock. All 14 lines in stock, | 실시간 벤더 재고와 대조해 검색. 14개 항목 모두 재고 있음, | ✅ |
+| `demoStory.beat2.note.strong2` | $18.62 | $18.62 | ✅ |
+| `demoStory.beat2.note.tail` | a board. Picking a chip that's out of stock for nine months is what actually kills hardware projects. | 에 보드 한 장. 9개월간 재고가 없는 칩을 고르는 게 하드웨어 프로젝트를 정말로 망칩니다. | ✅ |
+| `demoStory.beat3.title` | It draws it and routes it | 그리고 그려서 배선합니다 | ✅ |
+| `demoStory.beat3.note.strong` | 96 nets | 96개 net | ✅ |
+| `demoStory.beat3.note.tail` | , all routed · 4 layers · 100 × 60 mm. The pump drivers sit along one edge sharing a copper pour, so they spread heat instead of cooking each other. | 모두 배선 완료 · 4레이어 · 100 × 60 mm. 펌프 드라이버는 한쪽 가장자리에 모여 구리 영역을 공유해서, 서로 열을 주고받는 대신 함께 방열합니다. | ✅ |
+| `demoStory.beat4.title` | Then it checks it and orders it | 그다음 검사하고 주문합니다 | ✅ |
+| `demoStory.beat4.drc` | 1,800 design-rule checks · 0 errors | 디자인 룰 체크 1,800건 · 오류 0건 | ✅ |
+| `demoStory.beat4.boards` | Boards | 보드 수 | ✅ |
+| `demoStory.beat4.stack` | Stack | 레이어 | ✅ |
+| `demoStory.beat4.leadTime` | Lead time | 제작 기간 | ✅ |
+| `demoStory.beat4.total` | Total | 총액 | ✅ |
+| `demoStory.beat4.order` | Order 5 boards · $28.40 | 보드 5장 주문 · $28.40 | ✅ |
+| `demoStory.beat4.note` | Gerbers exported, every rule checked, and the job quoted with the factory. That's a real board on its way to be manufactured — from three sentences of English. | 거버를 내보내고, 모든 규칙을 검사하고, 공장에서 견적까지 받았습니다. 문장 세 개로, 실제로 제작에 들어가는 보드가 나왔습니다. | ✅ |
+| `demoStory.foot` | The live, playable demo runs on desktop | 실제로 조작 가능한 라이브 데모는 데스크톱에서 실행됩니다 | ✅ |
 
 ## Page metadata (browser tab title + SEO description)
 

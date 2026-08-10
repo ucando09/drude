@@ -1,0 +1,2325 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>P-say-B — 자연어로 만드는 PCB 설계</title>
+<style>
+/* ============================================================
+   P-say-B mock — design tokens
+   Deliberately dark-only: this mocks a desktop CAD/IDE shell.
+   ============================================================ */
+:root{
+  --bg:#0a0c0f;
+  --panel:#0f1318;
+  --panel-2:#141a21;
+  --panel-3:#19212a;
+  --border:#222b36;
+  --border-soft:#1a222c;
+  --text:#dde5ee;
+  --text-dim:#98a5b4;
+  --muted:#6b7887;
+  --accent:#4f8cff;
+  --accent-dim:#1f3358;
+  --green:#2ecc71;
+  --purple:#a78bfa;
+  --amber:#f0b429;
+  --red:#ef4757;
+  --copper:#c87137;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --sans:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --r:8px;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font:13px/1.5 var(--sans);
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+}
+button,input,textarea,select{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#2a3441;border-radius:6px}
+::-webkit-scrollbar-thumb:hover{background:#374556}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- app shell ---------- */
+.app{display:grid;grid-template-rows:36px 1fr 24px;height:100vh}
+
+/* ---------- top bar ---------- */
+.topbar{
+  display:flex;align-items:center;gap:14px;padding:0 12px;
+  background:var(--panel);border-bottom:1px solid var(--border);
+  -webkit-app-region:drag;
+}
+.traffic{display:flex;gap:8px;margin-right:4px}
+.traffic i{width:11px;height:11px;border-radius:50%;display:block}
+.traffic i:nth-child(1){background:#ff5f57}
+.traffic i:nth-child(2){background:#febc2e}
+.traffic i:nth-child(3){background:#28c840}
+.tb-title{font-size:12px;color:var(--text-dim);letter-spacing:.2px}
+.tb-title b{color:var(--text);font-weight:600}
+.tb-spacer{flex:1}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px currentColor;color:var(--green)}
+.dot.amber{background:var(--amber);color:var(--amber)}
+.dot.red{background:var(--red);color:var(--red)}
+
+/* ---------- 3-pane body ---------- */
+.body{
+  display:grid;
+  grid-template-columns:var(--c1,246px) var(--c2,minmax(360px,1fr)) var(--c3,minmax(420px,1.15fr));
+  min-height:0;transition:grid-template-columns .18s ease;
+}
+.body.sb-collapsed{--c1:46px}
+.body.cv-collapsed{--c3:0px}
+.body.cv-collapsed .canvaspane{display:none}
+
+/* workspace panel expanded to fill the window (Claude-style ⤢) */
+.body.cv-expanded{--c1:0px;--c2:0px;--c3:1fr}
+.body.cv-expanded .sidebar,
+.body.cv-expanded .chatpane{display:none}
+.i-shrink{display:none}
+.body.cv-expanded .i-expand{display:none}
+.body.cv-expanded .i-shrink{display:block}
+.icon-btn.close:hover{background:rgba(239,71,87,.14);color:#ff8593}
+
+/* pane toggle buttons in the top bar */
+.tb-toggle{
+  width:24px;height:22px;display:grid;place-items:center;border-radius:5px;color:var(--muted);
+  -webkit-app-region:no-drag;
+}
+.tb-toggle:hover{background:var(--panel-2);color:var(--text)}
+.tb-toggle.off{color:#44515f}
+
+/* collapsed sidebar icon rail */
+.sb-rail{display:none;flex-direction:column;align-items:center;gap:5px;padding:9px 0}
+.body.sb-collapsed .sidebar > *:not(.sb-rail){display:none}
+.body.sb-collapsed .sb-rail{display:flex}
+.rail-btn{
+  width:30px;height:30px;display:grid;place-items:center;border-radius:7px;color:var(--text-dim);position:relative;
+}
+.rail-btn:hover{background:var(--panel-2);color:var(--text)}
+.rail-btn .n{
+  position:absolute;top:1px;right:1px;background:var(--accent);color:#fff;font-size:8px;font-weight:700;
+  border-radius:999px;padding:0 3px;line-height:1.5;
+}
+.rail-sep{width:20px;height:1px;background:var(--border-soft);margin:3px 0}
+.rail-spacer{flex:1}
+.pane{min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.sidebar{background:var(--panel);border-right:1px solid var(--border)}
+.chatpane{background:var(--bg);border-right:1px solid var(--border)}
+.canvaspane{background:var(--panel)}
+
+/* ---------- sidebar ---------- */
+.sb-top{padding:10px;border-bottom:1px solid var(--border-soft)}
+/* deliberately not a CTA — same visual weight as the History / Tasks rows */
+.btn-new{
+  width:100%;display:flex;align-items:center;gap:9px;text-align:left;
+  padding:6px 8px;border-radius:6px;font-size:12.5px;color:var(--text);
+}
+.btn-new:hover{background:var(--panel-2)}
+.sb-search{
+  margin-top:9px;display:flex;align-items:center;gap:7px;background:var(--panel-2);
+  border:1px solid var(--border);border-radius:6px;padding:5px 8px;
+}
+.sb-search input{background:none;border:0;outline:0;width:100%;font-size:12px}
+.sb-search input::placeholder{color:var(--muted)}
+.sb-scroll{flex:1;overflow-y:auto;padding:8px 6px 14px}
+.sb-sec{margin-top:6px}
+.sb-sec-hd{
+  display:flex;align-items:center;gap:6px;padding:5px 8px;
+  font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600;
+}
+.sb-sec-hd .sp{flex:1}
+.icon-btn{
+  width:20px;height:20px;display:grid;place-items:center;border-radius:4px;color:var(--muted);
+}
+.icon-btn:hover{background:var(--panel-3);color:var(--text)}
+.row{
+  display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;
+  color:var(--text-dim);font-size:12.5px;cursor:pointer;
+}
+.row:hover{background:var(--panel-2);color:var(--text)}
+.row.active{background:var(--panel-3);color:var(--text)}
+.row .age{margin-left:auto;font-size:10.5px;color:var(--muted);flex:none}
+.row .badge-n{
+  margin-left:auto;font-size:10px;background:var(--accent);color:#fff;border-radius:999px;
+  padding:0 6px;font-weight:600;
+}
+.proj{margin-top:2px}
+.proj-hd{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:12.5px}
+.proj-hd:hover{background:var(--panel-2)}
+.proj-hd .caret{color:var(--muted);transition:transform .15s;font-size:9px;width:9px}
+.proj.open .caret{transform:rotate(90deg)}
+.proj-hd .name{font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stage-pill{
+  font-size:9px;font-weight:700;letter-spacing:.06em;padding:1px 6px;border-radius:999px;flex:none;
+  border:1px solid currentColor;
+}
+.s-PLAN{color:#69a1ff}.s-SCHEMATIC{color:var(--purple)}.s-LAYOUT{color:var(--green)}.s-FAB{color:var(--amber)}
+/* projects carry no stage — only a conversation count */
+.conv-count{
+  font-size:10px;color:var(--muted);background:var(--panel-3);border-radius:999px;
+  padding:0 6px;flex:none;font-family:var(--mono);
+}
+.proj-kids{display:none;margin:2px 0 6px 15px;border-left:1px solid var(--border-soft);padding-left:6px}
+.proj.open .proj-kids{display:block}
+.kid{
+  display:flex;align-items:center;gap:7px;padding:4px 7px;border-radius:5px;font-size:12px;
+  color:var(--text-dim);cursor:pointer;
+}
+.kid:hover{background:var(--panel-2);color:var(--text)}
+.kid.active{background:#1b2b46;color:#cfe0ff}
+.kid .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kid .age{margin-left:auto;font-size:10px;color:var(--muted);flex:none}
+.sb-foot{border-top:1px solid var(--border-soft);padding:7px 10px;display:flex;align-items:center;gap:9px}
+.sb-foot .row{flex:1;padding:4px 6px}
+
+/* ---------- chat pane ---------- */
+.chat-hd{
+  display:flex;align-items:center;gap:9px;padding:9px 14px;border-bottom:1px solid var(--border-soft);
+  background:var(--panel);flex:none;
+}
+/* breadcrumb-style workspace picker: folder · project ˅ / conversation */
+.picker{
+  display:flex;align-items:center;gap:7px;padding:4px 8px;border-radius:7px;
+  font-size:12.5px;color:var(--text-dim);cursor:pointer;
+}
+.picker:hover{background:var(--panel-2);color:var(--text)}
+.crumb-sep{color:#3a4551;font-size:12px;flex:none}
+.crumb-title{
+  font-size:12.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;
+}
+.locked-badge{
+  display:flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;border-radius:6px;
+  background:var(--panel-2);border:1px solid var(--border);color:var(--text-dim);
+}
+.locked-badge svg{opacity:.75}
+
+/* pipeline rail */
+.rail{display:flex;align-items:center;gap:0;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--border);flex:none}
+.step{display:flex;align-items:center;gap:7px;opacity:.45}
+.step .num{
+  width:19px;height:19px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:700;
+  border:1.5px solid currentColor;
+}
+.step .lb{font-size:11px;font-weight:600;letter-spacing:.05em}
+.step.done{opacity:1;color:var(--green)}
+.step.current{opacity:1;color:var(--accent)}
+.step.current .num{background:rgba(79,140,255,.16);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(79,140,255,.45)}50%{box-shadow:0 0 0 5px rgba(79,140,255,0)}}
+.rail .link{flex:1;height:1.5px;background:var(--border);margin:0 9px;border-radius:2px;position:relative;overflow:hidden}
+.rail .link.filled{background:linear-gradient(90deg,var(--green),var(--accent))}
+.rail .link.active::after{
+  content:"";position:absolute;inset:0;width:36%;background:linear-gradient(90deg,transparent,var(--accent),transparent);
+  animation:flow 1.6s linear infinite;
+}
+@keyframes flow{from{transform:translateX(-100%)}to{transform:translateX(340%)}}
+
+.thread{flex:1;overflow-y:auto;padding:26px 22px 12px;scroll-behavior:smooth}
+.msg{max-width:760px;margin:0 auto 22px}
+
+/* user turn — a subtly filled field, no avatar and no name */
+.msg.user .bubble{
+  position:relative;background:var(--panel-2);border:1px solid var(--border-soft);
+  border-radius:10px;padding:11px 118px 11px 14px;color:var(--text);
+}
+.msg .meta{
+  position:absolute;top:9px;right:11px;display:flex;align-items:center;gap:7px;
+  font-size:10.5px;color:var(--muted);opacity:0;transition:opacity .14s;
+}
+.msg:hover .meta{opacity:1}
+.meta button{
+  color:var(--muted);display:grid;place-items:center;width:18px;height:18px;border-radius:4px;
+}
+.meta button:hover{background:var(--panel-3);color:var(--text-dim)}
+
+/* assistant turn — plain prose directly on the page */
+.bubble{font-size:13.5px;line-height:1.68;color:var(--text-dim)}
+.bubble p{margin:0 0 10px}
+.bubble p:last-child{margin-bottom:0}
+.bubble strong{color:var(--text);font-weight:600}
+.bubble code{font-family:var(--mono);font-size:11.5px;background:var(--panel-2);padding:1.5px 5px;border-radius:4px;color:#a8c7ff}
+.bubble ul{margin:0 0 10px;padding-left:18px}
+.bubble li{margin-bottom:4px}
+.turn-foot{display:flex;align-items:center;margin-top:12px;font-size:10.5px;color:var(--muted)}
+.turn-foot .acts{margin-left:auto;display:flex;gap:2px;opacity:0;transition:opacity .14s}
+.msg:hover .turn-foot .acts{opacity:1}
+.turn-foot button{color:var(--muted);display:grid;place-items:center;width:20px;height:20px;border-radius:4px}
+.turn-foot button:hover{background:var(--panel-2);color:var(--text-dim)}
+
+/* agent work — one quiet line per step, expands to its raw output */
+.step-row{margin:3px 0}
+.step-line{
+  display:inline-flex;align-items:center;gap:7px;padding:2px 0;
+  font-size:13px;color:var(--muted);cursor:pointer;text-align:left;
+}
+.step-line:hover{color:var(--text-dim)}
+.step-line .chev{transition:transform .16s;flex:none;opacity:.75}
+.step-row.open .step-line .chev{transform:rotate(90deg)}
+.step-out{
+  display:none;margin:5px 0 12px;padding:1px 0 1px 13px;border-left:1.5px solid var(--border);
+  font-family:var(--mono);font-size:11.5px;line-height:1.65;color:var(--muted);white-space:pre-wrap;
+}
+.step-row.open .step-out{display:block}
+.spin{width:11px;height:11px;border:1.5px solid #2a3441;border-top-color:var(--text-dim);border-radius:50%;animation:sp .7s linear infinite;flex:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* artifacts written by a turn */
+.artifacts{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.artifact-link{
+  display:inline-flex;align-items:center;gap:7px;padding:5px 10px;border-radius:7px;
+  background:var(--panel-2);font-family:var(--mono);font-size:11px;color:var(--text-dim);cursor:pointer;
+}
+.artifact-link:hover{background:var(--panel-3);color:var(--text)}
+.artifact-link svg{opacity:.55}
+
+/* ---------- prompt bar ---------- */
+.composer{padding:10px 16px 14px;flex:none;position:relative}
+.cbox{
+  border:1px solid var(--border);background:var(--panel);border-radius:11px;
+  box-shadow:0 8px 26px -14px #000;transition:border-color .15s;
+}
+.cbox:focus-within{border-color:#3a5f9e;box-shadow:0 0 0 3px rgba(79,140,255,.09),0 8px 26px -14px #000}
+.cbox textarea{
+  width:100%;background:none;border:0;outline:0;resize:none;padding:11px 13px 4px;
+  font-size:13px;line-height:1.55;max-height:150px;min-height:44px;
+}
+.cbox textarea::placeholder{color:var(--muted)}
+.ctrls{display:flex;align-items:center;gap:6px;padding:6px 8px 8px 10px}
+.ctl{
+  display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-dim);
+  padding:4px 8px;border-radius:6px;cursor:pointer;
+}
+.ctl:hover{background:var(--panel-2);color:var(--text)}
+.ctl.locked{opacity:.72;cursor:not-allowed;border:1px dashed var(--border)}
+.ctl.locked:hover{background:none;color:var(--text-dim)}
+.ctl.rec{color:var(--red);background:rgba(239,71,87,.1)}
+.ctl .caretd{font-size:8px;color:var(--muted)}
+.ctrls .sp{flex:1}
+.ctl .sub{color:var(--muted)}
+
+/* ---------- inline "new conversation" draft (no modal) ---------- */
+.draft-hd{display:none;margin:0 0 11px 3px}
+.draft-proj{
+  display:inline-flex;align-items:center;gap:8px;padding:5px 9px;border-radius:7px;
+  font-size:15px;color:var(--text-dim);
+}
+.draft-proj:hover{background:var(--panel-2);color:var(--text)}
+.draft-proj b{font-weight:500}
+.chatpane.draft .chat-hd,
+.chatpane.draft .rail,
+.chatpane.draft .thread{display:none}
+.chatpane.draft .composer{margin:auto;max-width:780px;width:100%}
+.chatpane.draft .draft-hd{display:block}
+.chatpane.draft .cbox textarea{min-height:58px;font-size:14px}
+.send{
+  width:30px;height:30px;border-radius:50%;background:#2b3542;color:var(--text);
+  display:grid;place-items:center;transition:background .14s;
+}
+.send:hover:not(:disabled){background:#3a4859}
+.send:disabled{background:var(--panel-3);color:#465360;cursor:not-allowed}
+
+/* wave viz */
+.wave{display:flex;align-items:center;gap:2px;height:12px}
+.wave i{width:2px;background:var(--red);border-radius:2px;animation:w .8s ease-in-out infinite}
+.wave i:nth-child(2){animation-delay:.1s}.wave i:nth-child(3){animation-delay:.2s}
+.wave i:nth-child(4){animation-delay:.3s}.wave i:nth-child(5){animation-delay:.15s}
+@keyframes w{0%,100%{height:3px}50%{height:12px}}
+
+/* popups (@ / and dropdowns) */
+.pop{
+  position:absolute;bottom:calc(100% - 4px);left:16px;right:16px;max-width:430px;
+  background:var(--panel-2);border:1px solid var(--border);border-radius:9px;
+  box-shadow:0 18px 44px -14px #000;overflow:hidden;z-index:40;display:none;
+}
+.pop.show{display:block}
+.pop-hd{padding:6px 11px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);border-bottom:1px solid var(--border-soft)}
+.pop-item{display:flex;align-items:center;gap:9px;padding:7px 11px;cursor:pointer;font-size:12px}
+.pop-item:hover,.pop-item.sel{background:#1b2635}
+.pop-item .k{font-family:var(--mono);color:#a8c7ff;flex:none}
+.pop-item .d{color:var(--muted);font-size:11px;margin-left:auto;text-align:right}
+.menu{
+  position:absolute;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;
+  box-shadow:0 18px 44px -14px #000;padding:4px;z-index:60;display:none;min-width:210px;
+}
+.menu.show{display:block}
+.menu .mi{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:6px;cursor:pointer;font-size:12px}
+.menu .mi:hover{background:#1b2635}
+.menu .mi .sub{display:block;font-size:10.5px;color:var(--muted)}
+.menu .sep{height:1px;background:var(--border-soft);margin:4px 2px}
+.menu .mi.on{color:#a8c7ff}
+
+/* ---------- canvas pane ---------- */
+.tabs{display:flex;align-items:center;gap:2px;padding:0 10px;background:var(--panel);border-bottom:1px solid var(--border);flex:none}
+.tab{
+  padding:10px 13px;font-size:12px;color:var(--muted);border-bottom:2px solid transparent;
+  display:flex;align-items:center;gap:7px;cursor:pointer;
+}
+.tab:hover{color:var(--text-dim)}
+.tab.active{color:var(--text);border-bottom-color:var(--accent)}
+.tab .st-dot{width:5px;height:5px;border-radius:50%;background:var(--border)}
+.tab.ready .st-dot{background:var(--green)}
+.tab.pending .st-dot{background:var(--amber)}
+.tabs .sp{flex:1}
+.tab-tools{display:flex;gap:4px;padding-right:2px}
+.canvas-body{flex:1;overflow:auto;padding:14px}
+.view{display:none}
+.view.show{display:block}
+
+.card{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:12px}
+.card-hd{display:flex;align-items:center;gap:9px;padding:9px 12px;border-bottom:1px solid var(--border-soft);font-size:11.5px;font-weight:600}
+.card-hd .sp{flex:1}
+.card-hd .meta{font-weight:400;color:var(--muted);font-size:11px;font-family:var(--mono)}
+.card-bd{padding:12px}
+.mini-btn{font-size:11px;padding:3px 9px;border-radius:5px;border:1px solid var(--border);color:var(--text-dim);background:var(--panel-3)}
+.mini-btn:hover{color:var(--text);border-color:#36434f}
+.mini-btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.mini-btn.pri:hover{filter:brightness(1.1)}
+
+table{width:100%;border-collapse:collapse;font-size:11.5px}
+th{
+  text-align:left;padding:7px 10px;color:var(--muted);font-weight:600;font-size:10px;
+  text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);
+}
+td{padding:7px 10px;border-bottom:1px solid var(--border-soft);color:var(--text-dim)}
+tr:last-child td{border-bottom:0}
+tbody tr:hover{background:#161e27}
+td.ref{font-family:var(--mono);color:#a8c7ff}
+td.num{text-align:right;font-family:var(--mono)}
+.stock{font-size:10px;padding:1px 6px;border-radius:999px;border:1px solid currentColor}
+.ok{color:var(--green)}.low{color:var(--amber)}.no{color:var(--red)}
+
+.kv{display:grid;grid-template-columns:auto 1fr;gap:7px 14px;font-size:11.5px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;font-family:var(--mono);color:var(--text-dim)}
+
+.slider-row{display:grid;grid-template-columns:120px 1fr 62px;align-items:center;gap:11px;margin-bottom:11px;font-size:11.5px}
+.slider-row label{color:var(--text-dim)}
+.slider-row output{font-family:var(--mono);text-align:right;color:#a8c7ff}
+input[type=range]{-webkit-appearance:none;appearance:none;height:3px;background:var(--panel-3);border-radius:3px;outline:0}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--accent);
+  border:2px solid var(--panel-2);cursor:pointer;
+}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:11px;padding:3px 9px;border-radius:999px;background:var(--panel-3);border:1px solid var(--border);color:var(--text-dim);cursor:pointer}
+.chip.on{background:#1b2b46;border-color:#3a5f9e;color:#cfe0ff}
+
+.stage-viewport{background:#080a0d;border-radius:8px;border:1px solid var(--border-soft);position:relative;overflow:hidden}
+.vp-tools{position:absolute;top:8px;right:8px;display:flex;gap:5px;z-index:2}
+.vp-legend{position:absolute;left:8px;bottom:8px;display:flex;gap:9px;font-size:10px;color:var(--muted);z-index:2}
+.vp-legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+
+.issue{display:flex;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border-soft);font-size:11.5px;cursor:pointer}
+.issue:last-child{border-bottom:0}
+.issue:hover{background:#161e27}
+.issue .ic{flex:none;width:15px;height:15px;border-radius:4px;display:grid;place-items:center;font-size:10px;font-weight:700}
+.issue.err .ic{background:rgba(239,71,87,.16);color:var(--red)}
+.issue.warn .ic{background:rgba(240,180,41,.16);color:var(--amber)}
+.issue.info .ic{background:rgba(79,140,255,.16);color:var(--accent)}
+.issue .txt{flex:1}
+.issue .loc{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px}
+
+.quote{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.q-tile{background:var(--panel-3);border:1px solid var(--border-soft);border-radius:8px;padding:10px}
+.q-tile .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.q-tile .val{font-size:17px;font-weight:600;margin-top:3px;font-family:var(--mono)}
+.q-tile .val.big{color:var(--amber)}
+.order-btn{
+  width:100%;margin-top:11px;padding:11px;border-radius:9px;font-weight:600;font-size:13px;
+  background:linear-gradient(180deg,#f0b429,#d99a12);color:#231a05;
+  box-shadow:0 6px 20px -10px #f0b429;
+}
+.order-btn:hover{filter:brightness(1.06)}
+.order-btn:disabled{background:var(--panel-3);color:var(--muted);box-shadow:none;cursor:not-allowed}
+
+.empty{display:grid;place-items:center;height:100%;min-height:300px;text-align:center;color:var(--muted);gap:9px}
+.empty .t{font-size:13px;color:var(--text-dim)}
+.empty .s{font-size:11.5px;max-width:290px;line-height:1.6}
+
+/* ============================================================
+   EASY MODE
+   A parallel set of workspace views for someone who has never
+   seen a circuit board. Same tokens as the technical views, but a
+   narrower palette and larger type — and deliberately no --mono,
+   because monospace reads as "machine output", which is exactly
+   the signal easy mode is trying not to send.
+   ============================================================ */
+.mode-seg{
+  display:flex;gap:2px;background:var(--panel-2);border:1px solid var(--border);
+  border-radius:7px;padding:2px;margin-right:9px;
+}
+.mode-seg .seg{font-size:11px;padding:3px 11px;border-radius:5px;color:var(--muted)}
+.mode-seg .seg:hover{color:var(--text-dim)}
+.mode-seg .seg.on{background:var(--panel-3);color:var(--text)}
+
+.easy{max-width:660px;font-size:14.5px;line-height:1.7;color:var(--text-dim);padding:8px 4px 34px}
+.easy h2{font-size:19px;font-weight:600;color:var(--text);margin:0 0 7px;letter-spacing:-.01em}
+.easy h3{font-size:13.5px;font-weight:600;color:var(--text);margin:0 0 11px}
+.easy p{margin:0 0 12px}
+.easy p:last-child{margin-bottom:0}
+.easy strong{color:var(--text);font-weight:600}
+.easy .e-def{font-size:13.5px;color:var(--muted);margin:0 0 30px;line-height:1.7}
+.e-sec{margin-bottom:32px}
+.e-sec:last-child{margin-bottom:0}
+.e-note{font-size:12.5px;color:var(--muted);line-height:1.65;margin:10px 0 0}
+.e-note.tight{margin:-4px 0 12px}
+
+/* one part per row: what it does, and why this one */
+.e-part{display:flex;gap:13px;padding:14px 0;border-top:1px solid var(--border-soft)}
+.e-part:last-of-type{border-bottom:1px solid var(--border-soft)}
+.e-part .e-ic{
+  flex:none;width:30px;height:30px;border-radius:8px;background:var(--panel-2);
+  display:grid;place-items:center;color:var(--muted);margin-top:3px;
+}
+.e-part .e-nm{font-size:13.5px;font-weight:600;color:var(--text)}
+.e-part .e-nm span{font-size:11.5px;font-weight:400;color:var(--muted);margin-left:7px}
+.e-part .e-dsc{font-size:13px;line-height:1.65;margin-top:2px}
+
+/* power chain — three steps, left to right */
+.e-flow{display:flex;align-items:center;flex-wrap:wrap;gap:2px;margin-top:12px}
+.e-flow .e-node{
+  flex:1;min-width:104px;background:var(--panel-2);border:1px solid var(--border-soft);
+  border-radius:9px;padding:10px 12px;
+}
+.e-flow .e-node .v{font-size:14px;color:var(--text);font-weight:600}
+.e-flow .e-node .l{font-size:11.5px;color:var(--muted);margin-top:1px;line-height:1.5}
+.e-flow .e-arrow{flex:none;display:grid;place-items:center;color:#3d4854;padding:0 7px}
+
+.e-metric{
+  display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border-soft);
+  border:1px solid var(--border-soft);border-radius:10px;overflow:hidden;
+}
+.e-metric > div{background:var(--panel-2);padding:13px 14px}
+.e-metric .v{font-size:16px;color:var(--text);font-weight:600}
+.e-metric .l{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.55}
+
+/* a single yes/no finding, stated as cause and effect */
+.e-check{display:flex;gap:12px;padding:14px 0;border-top:1px solid var(--border-soft)}
+.e-check:last-of-type{border-bottom:1px solid var(--border-soft)}
+.e-check .e-dot{
+  flex:none;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;margin-top:3px;
+}
+.e-check.good .e-dot{background:rgba(46,204,113,.12);color:#5cb98a}
+.e-check.bad  .e-dot{background:rgba(239,71,87,.11);color:#cf7581}
+.e-check.mute .e-dot{background:var(--panel-3);color:var(--muted)}
+.e-check .t{font-size:13.5px;color:var(--text);font-weight:500}
+.e-check .d{font-size:13px;margin-top:3px;line-height:1.65}
+
+.e-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;font-size:13px;
+  padding:9px 16px;border-radius:8px;background:var(--panel-3);border:1px solid var(--border);color:var(--text);
+}
+.e-btn:hover:not(:disabled){background:#1e2731;border-color:#36434f}
+.e-btn:disabled{background:var(--panel-2);color:var(--muted);cursor:not-allowed}
+.e-btn.wide{width:100%;padding:12px;margin-top:14px}
+
+/* labelled slider: the consequence, not the unit */
+.e-ctl{margin-bottom:20px}
+.e-ctl:last-child{margin-bottom:0}
+.e-ctl .e-hd{display:flex;align-items:baseline;gap:9px}
+.e-ctl .e-hd label{font-size:13.5px;color:var(--text);font-weight:500}
+.e-ctl .e-hd output{margin-left:auto;font-size:13.5px;color:var(--text);font-weight:600}
+.e-ctl .e-hlp{font-size:12.5px;color:var(--muted);line-height:1.6;margin:2px 0 10px}
+.e-ctl input[type=range]{width:100%}
+
+.e-fig{background:#080a0d;border:1px solid var(--border-soft);border-radius:10px;overflow:hidden;position:relative}
+.e-cap{font-size:12.5px;color:var(--muted);line-height:1.65;margin-top:10px}
+.e-legend{
+  position:absolute;left:10px;bottom:9px;display:flex;gap:12px;font-size:10.5px;color:var(--muted);
+}
+.e-legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+
+/* ---------- status bar ---------- */
+.statusbar{
+  display:flex;align-items:center;gap:16px;padding:0 12px;background:var(--panel);
+  border-top:1px solid var(--border);font-size:10.5px;color:var(--muted);font-family:var(--mono);
+}
+.statusbar .sp{flex:1}
+.statusbar span{display:flex;align-items:center;gap:6px}
+.statusbar .path{color:var(--text-dim)}
+
+.toast{
+  position:fixed;bottom:38px;left:50%;transform:translateX(-50%) translateY(14px);opacity:0;
+  background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:9px 15px;
+  font-size:12px;box-shadow:0 16px 40px -14px #000;z-index:200;pointer-events:none;transition:.22s;
+  display:flex;align-items:center;gap:9px;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media (max-width:1200px){
+  .body{grid-template-columns:210px 1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===================== TOP BAR ===================== -->
+  <header class="topbar">
+    <div class="traffic"><i></i><i></i><i></i></div>
+    <button class="tb-toggle" id="tgSidebar" title="사이드바 전환  (Ctrl+B)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+        <rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="M6 9h0.01M6 12h0.01" stroke-linecap="round"/>
+      </svg>
+    </button>
+    <div class="tb-title">P-say-B — <b id="tbProject">cocktail-robot</b> <span style="color:var(--muted)">·</span> <span id="tbStage">레이아웃</span></div>
+    <div class="tb-spacer"></div>
+  </header>
+
+  <!-- ===================== BODY ===================== -->
+  <div class="body">
+
+    <!-- ---------- LEFT SIDEBAR ---------- -->
+    <aside class="pane sidebar">
+      <!-- collapsed state: icon rail -->
+      <div class="sb-rail">
+        <button class="rail-btn" id="railNew" title="새 대화">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <div class="rail-sep"></div>
+        <button class="rail-btn" id="railSearch" title="대화 검색">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        </button>
+        <button class="rail-btn" id="railHistory" title="기록">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        </button>
+        <button class="rail-btn" id="railTasks" title="예약된 작업">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h9"/></svg>
+          <span class="n">2</span>
+        </button>
+        <button class="rail-btn" id="railProjects" title="프로젝트">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        </button>
+        <div class="rail-spacer"></div>
+        <button class="rail-btn" id="railExpand" title="사이드바 펼치기  (Ctrl+B)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+
+      <div class="sb-top">
+        <button class="btn-new" id="btnNewConv">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          새 대화
+        </button>
+        <div class="sb-search">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input id="sbSearch" placeholder="대화 검색…" />
+        </div>
+      </div>
+
+      <div class="sb-scroll">
+        <div class="sb-sec">
+          <div class="row" id="rowHistory">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            기록
+          </div>
+          <div class="row" id="rowTasks">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h9"/></svg>
+            예약된 작업 <span class="badge-n">2</span>
+          </div>
+        </div>
+
+        <div class="sb-sec">
+          <div class="sb-sec-hd">
+            프로젝트 <span class="sp"></span>
+            <button class="icon-btn" title="프로젝트 필터">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>
+            </button>
+            <button class="icon-btn" id="btnFolderAdd" title="새 프로젝트 폴더">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5" stroke-width="1.6"/></svg>
+            </button>
+          </div>
+          <div id="projTree"></div>
+        </div>
+      </div>
+
+      <div class="sb-foot">
+        <div class="row">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.6.76 1 1.4 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          설정
+        </div>
+      </div>
+    </aside>
+
+    <!-- ---------- CENTER: CONVERSATION ---------- -->
+    <section class="pane chatpane">
+      <div class="chat-hd">
+        <button class="picker" id="projPicker">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h3.9a1.5 1.5 0 0 1 1.2.6l.9 1.2a1.5 1.5 0 0 0 1.2.6h7.8A1.5 1.5 0 0 1 21 9.9v7.6a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>
+          <b id="pkName">cocktail-robot</b>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <span class="crumb-sep">/</span>
+        <span class="crumb-title" id="pkTitle">4레이어 배치 &amp; 배선</span>
+        <div class="tb-spacer" style="flex:1"></div>
+        <div class="locked-badge" id="lockBadge" style="display:none">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+          <span id="lockText">LAYOUT · Gemini 3.1 Pro</span>
+        </div>
+      </div>
+
+      <div class="rail" id="rail"></div>
+
+      <div class="thread" id="thread"></div>
+
+      <div class="composer">
+        <!-- shown only while composing a brand-new conversation -->
+        <div class="draft-hd" id="draftHd">
+          <button class="draft-proj" id="draftProj" title="프로젝트 워크스페이스 선택">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            <b id="draftProjName">cocktail-robot</b>
+            <span style="font-size:9px;color:var(--muted)">▾</span>
+          </button>
+        </div>
+
+        <!-- slash / mention popups -->
+        <div class="pop" id="popSlash">
+          <div class="pop-hd">파이프라인 작업</div>
+          <div id="popSlashList"></div>
+        </div>
+        <div class="pop" id="popMention">
+          <div class="pop-hd">멘션 컨텍스트</div>
+          <div id="popMentionList"></div>
+        </div>
+
+        <div class="cbox">
+          <textarea id="input" rows="1" placeholder="무엇이든 물어보세요. 멘션은 @, 작업은 /"></textarea>
+          <div class="ctrls">
+            <button class="ctl" id="btnAttach" title="데이터시트 / 거버 / 핀아웃 첨부">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <button class="ctl" id="btnTarget" title="실행 위치">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="4.5" width="19" height="13" rx="1.8"/><path d="M9 21h6" stroke-linecap="round"/></svg>
+              <span id="targetLabel">로컬</span>
+            </button>
+            <button class="ctl" id="btnModel">
+              <span id="modelLabel">Gemini 3.1 Pro</span><span class="sub" id="modelTier">High</span>
+              <svg class="caretd" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
+            </button>
+            <button class="ctl" id="btnStage" title="파이프라인 모드">
+              <span id="stageDot" class="dot" style="color:var(--green);background:var(--green)"></span>
+              <span id="stageLabel">레이아웃</span>
+              <svg class="caretd" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
+            </button>
+            <span class="sp"></span>
+            <button class="ctl" id="btnMic" title="음성 입력">
+              <span id="micInner">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+              </span>
+            </button>
+            <button class="send" id="btnSend" disabled title="보내기">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- RIGHT: CANVAS ---------- -->
+    <section class="pane canvaspane">
+      <div class="tabs" id="tabs">
+        <div class="tab ready" data-view="plan"><i class="st-dot"></i>기획</div>
+        <div class="tab ready" data-view="schematic"><i class="st-dot"></i>회로도</div>
+        <div class="tab active pending" data-view="layout"><i class="st-dot"></i>레이아웃</div>
+        <div class="tab" data-view="fab"><i class="st-dot"></i>제작</div>
+        <span class="sp"></span>
+        <!-- same four stages, two levels of explanation -->
+        <div class="mode-seg" id="modeSeg">
+          <button class="seg" data-mode="easy" title="쉬운 설명 — 하드웨어 지식이 없어도 이해할 수 있어요">쉬움</button>
+          <button class="seg on" data-mode="skilled" title="전체 기술 상세 정보">전문가</button>
+        </div>
+        <div class="tab-tools">
+          <button class="icon-btn" title="시스템 뷰어에서 열기">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+          </button>
+          <button class="icon-btn" title="디스크에서 새로고침">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 11a8 8 0 1 0-2.3 6"/><path d="M20 5v6h-6"/></svg>
+          </button>
+          <button class="icon-btn" id="btnExpandCv" title="패널 확장">
+            <svg class="i-expand" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 4h6v6"/><path d="M20 4l-6 6"/><path d="M10 20H4v-6"/><path d="M4 20l6-6"/>
+            </svg>
+            <svg class="i-shrink" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 14h6v6"/><path d="M10 14l-6 6"/><path d="M20 10h-6V4"/><path d="M14 10l6-6"/>
+            </svg>
+          </button>
+          <button class="icon-btn close" id="btnCollapseCv" title="패널 닫기  (Ctrl+Shift+B)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="canvas-body">
+        <!-- ===== PLAN VIEW ===== -->
+        <div class="view" id="view-plan">
+          <div class="card">
+            <div class="card-hd">
+              요구사항
+              <span class="sp"></span>
+              <span class="meta">01_plan/requirements.json</span>
+            </div>
+            <div class="card-bd">
+              <dl class="kv">
+                <dt>대상</dt><dd>칵테일 로봇 컨트롤러 (v2)</dd>
+                <dt>MCU</dt><dd>ESP32-WROOM-32E · Wi-Fi + BLE</dd>
+                <dt>전원</dt><dd>12V DC 배럴 잭 → 5V 벅 → 3.3V LDO</dd>
+                <dt>부하</dt><dd>연동 펌프 4개 (12V, 400mA)</dd>
+                <dt>I/O</dt><dd>I²C ×1, USB-C (CDC + PD 싱크), 리밋 스위치 ×4</dd>
+                <dt>환경</dt><dd>실내 · 0–45°C · IPC-2221 Class 2</dd>
+              </dl>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd">전기적 제약조건<span class="sp"></span><button class="mini-btn" id="btnResolveBom">BOM 다시 확인</button></div>
+            <div class="card-bd">
+              <div class="slider-row">
+                <label>레일 전압</label><input type="range" min="3" max="24" value="12" data-out="oV"><output id="oV">12 V</output>
+              </div>
+              <div class="slider-row">
+                <label>최대 전류</label><input type="range" min="0.5" max="6" step="0.1" value="2.4" data-out="oI"><output id="oI">2.4 A</output>
+              </div>
+              <div class="slider-row">
+                <label>보드 면적 예산</label><input type="range" min="20" max="200" value="100" data-out="oA"><output id="oA">100 mm</output>
+              </div>
+              <div style="margin-top:13px">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:7px;font-weight:600">인터페이스</div>
+                <div class="chips">
+                  <span class="chip on">I²C</span><span class="chip on">USB-C</span><span class="chip on">GPIO ×8</span>
+                  <span class="chip">SPI</span><span class="chip">CAN</span><span class="chip">RS-485</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd">
+              부품 목록 (BOM)
+              <span class="sp"></span>
+              <span class="meta" id="bomMeta">14개 항목 · 5개 기준 개당 $18.62</span>
+              <button class="mini-btn">CSV로 내보내기</button>
+            </div>
+            <table>
+              <thead><tr><th>참조</th><th>부품</th><th>패키지</th><th style="text-align:right">수량</th><th style="text-align:right">단가</th><th>재고</th></tr></thead>
+              <tbody id="bomBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ===== PLAN VIEW · EASY ===== -->
+        <div class="view easy" id="view-plan-easy">
+          <h2>기획</h2>
+          <p class="e-def">무언가를 만들기 전에 먼저 이 보드가 해야 할 일을 정하고, 각 역할에 맞는 부품을 고릅니다. 아직 확정된 건 아무것도 없습니다 — 하나를 바꾸면 그 뒤로 이어지는 모든 것이 함께 바뀝니다.</p>
+
+          <div class="e-sec">
+            <h3>요청하신 내용</h3>
+            <p>칵테일 로봇을 위한 컨트롤 보드입니다. 벽면 어댑터에 꽂아 쓰고, Wi-Fi에 연결되며, 튜브를 따라 음료를 밀어내는 작은 펌프 네 개를 구동합니다. 가장자리의 소켓으로 노트북을 연결해 소프트웨어를 업데이트할 수 있습니다.</p>
+            <p class="e-note">실내에서 상온으로 사용하는 것을 기준으로 설계했습니다.</p>
+          </div>
+
+          <div class="e-sec">
+            <h3>선택한 부품</h3>
+            <p class="e-note tight">네 가지 역할에 각각 하나씩 부품을 골랐습니다. 모두 오늘 기준으로 재고가 있습니다.</p>
+
+            <div class="e-part">
+              <div class="e-ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M10 7V4M14 7V4M10 20v-3M14 20v-3M7 10H4M7 14H4M20 10h-3M20 14h-3" stroke-linecap="round"/></svg></div>
+              <div>
+                <div class="e-nm">두뇌 <span>부품 1개</span></div>
+                <div class="e-dsc">Wi-Fi가 이미 내장된 아주 작은 컴퓨터입니다. 무선 통신 부분을 직접 만드는 대신 완제품 모듈을 선택했습니다 — 이런 보드에서 가장 실수하기 쉬운 부분인데, 이렇게 하면 그럴 일이 없습니다.</div>
+              </div>
+            </div>
+
+            <div class="e-part">
+              <div class="e-ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 12h4l2-4 2 8 2-4h4"/></svg></div>
+              <div>
+                <div class="e-nm">펌프 스위치 <span>부품 4개</span></div>
+                <div class="e-dsc">펌프마다 하나씩입니다. 펌프를 켜고 끄는 역할을 하면서, 모터가 멈추는 순간 튀는 전기 충격을 흡수해서 나머지 보드는 그 영향을 전혀 받지 않게 합니다.</div>
+              </div>
+            </div>
+
+            <div class="e-part">
+              <div class="e-ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M13 3L5 13.5h6L10 21l8.5-10.5H12z"/></svg></div>
+              <div>
+                <div class="e-nm">전원 회로 <span>부품 2개</span></div>
+                <div class="e-dsc">벽면 어댑터는 12볼트를 공급합니다. 펌프는 이 전압을 그대로 필요로 하지만, 컴퓨터는 이 전압이면 망가집니다. 그래서 전원은 보드를 거치며 두 번 낮아집니다.</div>
+                <div class="e-flow">
+                  <div class="e-node"><div class="v">12볼트</div><div class="l">벽면 어댑터에서 — 펌프를 구동</div></div>
+                  <span class="e-arrow"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 7l5 5-5 5"/></svg></span>
+                  <div class="e-node"><div class="v">5볼트</div><div class="l">노트북 소켓을 구동</div></div>
+                  <span class="e-arrow"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 7l5 5-5 5"/></svg></span>
+                  <div class="e-node"><div class="v">3.3볼트</div><div class="l">두뇌를 구동</div></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="e-part">
+              <div class="e-ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v5M16 3v5"/><path d="M5.5 8h13v4a6.5 6.5 0 0 1-13 0z"/><path d="M12 18.5V21"/></svg></div>
+              <div>
+                <div class="e-nm">소켓과 단자대 <span>부품 6개</span></div>
+                <div class="e-dsc">전원 어댑터용 원형 소켓 하나, 노트북용 USB-C 소켓 하나, 그리고 펌프 배선용 나사 단자 네 개입니다 — 전선을 꽂고 나사만 조이면 되니 직접 납땜할 필요가 없습니다.</div>
+              </div>
+            </div>
+
+            <p class="e-note">이 밖에도 전원을 안정시키고 부품끼리 간섭하지 않도록 돕는 작은 보조 부품이 33개 더 있습니다. 모두 표준 부품이고 합쳐도 몇 센트 수준입니다.</p>
+          </div>
+
+          <div class="e-sec">
+            <h3>비용</h3>
+            <div class="e-metric">
+              <div><div class="v">$18.62</div><div class="l">완성된 보드 1장, 모든 부품 포함</div></div>
+              <div><div class="v">$93.10</div><div class="l">실제로 주문할 보드 5장</div></div>
+            </div>
+            <p class="e-note">공장은 보드 1장을 만들 때나 5장을 만들 때나 비용이 거의 비슷하기 때문에, 5장을 주문해도 큰 차이가 없고 실험해 볼 여분도 생깁니다.</p>
+          </div>
+
+          <div class="e-sec">
+            <h3>바꿀 수 있는 값</h3>
+            <div class="e-ctl">
+              <div class="e-hd"><label>전원 어댑터</label><output id="eoV">12볼트</output></div>
+              <div class="e-hlp">벽면 어댑터에 적힌 숫자입니다. 값이 클수록 펌프의 힘은 세지지만, 어느 지점을 넘으면 보드에 더 크고 비싼 부품이 필요해집니다.</div>
+              <input type="range" min="3" max="24" value="12" data-eout="eoV" data-eunit="볼트">
+            </div>
+            <div class="e-ctl">
+              <div class="e-hd"><label>동시에 끌어오는 전류</label><output id="eoI">2.4암페어</output></div>
+              <div class="e-hlp">펌프 네 개가 동시에 돌 때 끌어오는 전류의 총합입니다. 이 값에 따라 보드의 전원 배선이 얼마나 두꺼워야 뜨거워지지 않고 버틸 수 있는지가 정해집니다.</div>
+              <input type="range" min="0.5" max="6" step="0.1" value="2.4" data-eout="eoI" data-eunit="암페어">
+            </div>
+            <div class="e-ctl">
+              <div class="e-hd"><label>보드가 가질 수 있는 최대 크기</label><output id="eoA">100mm</output></div>
+              <div class="e-hlp">가장 긴 변의 길이입니다. 감이 잘 안 온다면, 신용카드의 가로 길이가 86mm입니다. 보드가 작을수록 비용은 줄지만 부품을 배치할 공간도 줄어듭니다.</div>
+              <input type="range" min="20" max="200" value="100" data-eout="eoA" data-eunit="mm">
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== SCHEMATIC VIEW ===== -->
+        <div class="view" id="view-schematic">
+          <div class="card">
+            <div class="card-hd">
+              회로도
+              <span class="sp"></span>
+              <span class="meta">02_schematic/schematic.svg</span>
+              <button class="mini-btn">맞춤</button>
+            </div>
+            <div class="stage-viewport" style="height:330px">
+              <div class="vp-tools">
+                <button class="mini-btn">＋</button><button class="mini-btn">－</button>
+              </div>
+              <svg viewBox="0 0 640 340" width="100%" height="100%" id="schemSvg">
+                <defs>
+                  <pattern id="grid" width="16" height="16" patternUnits="userSpaceOnUse">
+                    <path d="M16 0H0V16" fill="none" stroke="#131920" stroke-width="1"/>
+                  </pattern>
+                  <marker id="dot" markerWidth="6" markerHeight="6" refX="3" refY="3">
+                    <circle cx="3" cy="3" r="2.2" fill="#4f8cff"/>
+                  </marker>
+                </defs>
+                <rect width="640" height="340" fill="url(#grid)"/>
+                <g stroke="#3f6ea8" stroke-width="1.4" fill="none">
+                  <path d="M120 78 H236"/><path d="M120 106 H236"/>
+                  <path d="M404 92 H470 V150"/><path d="M404 120 H452 V232"/>
+                  <path d="M236 168 H180 V232 H236"/>
+                  <path d="M404 168 H520 V78"/>
+                  <path d="M56 190 V240 H120"/>
+                </g>
+                <g fill="#4f8cff">
+                  <circle cx="236" cy="78" r="2.6"/><circle cx="404" cy="92" r="2.6"/>
+                  <circle cx="404" cy="168" r="2.6"/><circle cx="236" cy="232" r="2.6"/>
+                  <circle cx="520" cy="78" r="2.6"/>
+                </g>
+                <!-- blocks -->
+                <g font-family="ui-monospace,monospace" font-size="9.5">
+                  <g><rect x="236" y="58" width="168" height="130" rx="4" fill="#101922" stroke="#4f8cff" stroke-width="1.3"/>
+                     <text x="320" y="80" fill="#cfe0ff" text-anchor="middle" font-size="11">U1 · ESP32-WROOM-32E</text>
+                     <text x="320" y="96" fill="#6b7887" text-anchor="middle">38-pin SMD module</text>
+                     <text x="246" y="120" fill="#8b97a6">3V3</text><text x="246" y="136" fill="#8b97a6">GPIO21/SDA</text>
+                     <text x="246" y="152" fill="#8b97a6">GPIO22/SCL</text><text x="246" y="172" fill="#8b97a6">EN</text>
+                     <text x="394" y="120" fill="#8b97a6" text-anchor="end">GPIO25..28</text>
+                     <text x="394" y="152" fill="#8b97a6" text-anchor="end">USB D±</text>
+                  </g>
+                  <g><rect x="30" y="58" width="90" height="60" rx="4" fill="#101922" stroke="#2ecc71" stroke-width="1.2"/>
+                     <text x="75" y="80" fill="#a7e8c4" text-anchor="middle" font-size="10">U2 MP1584</text>
+                     <text x="75" y="96" fill="#6b7887" text-anchor="middle">12V→5V buck</text></g>
+                  <g><rect x="30" y="140" width="90" height="56" rx="4" fill="#101922" stroke="#2ecc71" stroke-width="1.2"/>
+                     <text x="75" y="162" fill="#a7e8c4" text-anchor="middle" font-size="10">U3 AMS1117</text>
+                     <text x="75" y="178" fill="#6b7887" text-anchor="middle">5V→3.3V LDO</text></g>
+                  <g><rect x="452" y="212" width="150" height="76" rx="4" fill="#101922" stroke="#f0b429" stroke-width="1.2"/>
+                     <text x="527" y="234" fill="#f3d894" text-anchor="middle" font-size="10">U4..U7 DRV8871</text>
+                     <text x="527" y="250" fill="#6b7887" text-anchor="middle">4× pump H-bridge</text>
+                     <text x="527" y="270" fill="#6b7887" text-anchor="middle">3.6 A peak / ch</text></g>
+                  <g><rect x="470" y="120" width="104" height="52" rx="4" fill="#101922" stroke="#a78bfa" stroke-width="1.2"/>
+                     <text x="522" y="142" fill="#cfc0ff" text-anchor="middle" font-size="10">J2 USB-C</text>
+                     <text x="522" y="158" fill="#6b7887" text-anchor="middle">CDC + 5V sink</text></g>
+                  <g><rect x="120" y="222" width="116" height="52" rx="4" fill="#101922" stroke="#a78bfa" stroke-width="1.2"/>
+                     <text x="178" y="244" fill="#cfc0ff" text-anchor="middle" font-size="10">U8 TCA9548A</text>
+                     <text x="178" y="260" fill="#6b7887" text-anchor="middle">I²C mux ×8</text></g>
+                  <text x="30" y="238" fill="#6b7887">J1 12V DC</text>
+                </g>
+              </svg>
+              <div class="vp-legend"><span><i style="background:#4f8cff"></i>MCU</span><span><i style="background:#2ecc71"></i>전원</span><span><i style="background:#f0b429"></i>드라이버</span><span><i style="background:#a78bfa"></i>인터페이스</span></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd">넷리스트 인스펙터<span class="sp"></span><span class="meta">96 nets · 214 pins</span></div>
+            <table>
+              <thead><tr><th>넷</th><th>노드</th><th>클래스</th><th style="text-align:right">폭</th></tr></thead>
+              <tbody>
+                <tr><td class="ref">+12V</td><td>J1.1, U2.IN, U4..U7.VM</td><td>전원</td><td class="num">1.20 mm</td></tr>
+                <tr><td class="ref">+5V</td><td>U2.OUT, U3.IN, J2.VBUS</td><td>전원</td><td class="num">0.80 mm</td></tr>
+                <tr><td class="ref">+3V3</td><td>U3.OUT, U1.3V3, U8.VCC</td><td>전원</td><td class="num">0.50 mm</td></tr>
+                <tr><td class="ref">SDA</td><td>U1.GPIO21, U8.SDA</td><td>신호</td><td class="num">0.25 mm</td></tr>
+                <tr><td class="ref">SCL</td><td>U1.GPIO22, U8.SCL</td><td>신호</td><td class="num">0.25 mm</td></tr>
+                <tr><td class="ref">PUMP1_IN1</td><td>U1.GPIO25, U4.IN1</td><td>신호</td><td class="num">0.30 mm</td></tr>
+                <tr><td class="ref">USB_DP</td><td>U1.D+, J2.DP</td><td>차동 90 Ω</td><td class="num">0.25 mm</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ===== SCHEMATIC VIEW · EASY ===== -->
+        <div class="view easy" id="view-schematic-easy">
+          <h2>배선 계획</h2>
+          <p class="e-def">무엇이 무엇에 연결되는지를 보여주는 지도입니다. 아직 어디에 물리적으로 놓일지는 정해지지 않았습니다 — 그 부분은 다음 단계에서 다룹니다.</p>
+
+          <div class="e-sec">
+            <h3>전체가 어떻게 맞물리는지</h3>
+            <div class="e-fig">
+              <svg viewBox="0 0 620 330" width="100%" height="100%" style="display:block">
+                <defs>
+                  <marker id="ea" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">
+                    <path d="M0 0.4 L6 3 L0 5.6" fill="none" stroke="#4a5867" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </marker>
+                </defs>
+                <g fill="none" stroke="#4a5867" stroke-width="1.3" marker-end="url(#ea)">
+                  <path d="M128 68 H386"/>
+                  <path d="M128 208 H188"/>
+                  <path d="M326 190 H356 V82 H386"/>
+                  <path d="M326 232 H386"/>
+                  <path d="M462 124 V184"/>
+                  <path d="M532 232 H542"/>
+                </g>
+                <g font-size="9.5" fill="#6b7887">
+                  <text x="257" y="60" text-anchor="middle">노트북을 여기에 연결</text>
+                  <text x="158" y="200" text-anchor="middle">12볼트</text>
+                  <text x="362" y="116">3.3볼트</text>
+                  <text x="356" y="224" text-anchor="middle">12볼트</text>
+                  <text x="470" y="158">켜짐 / 꺼짐</text>
+                </g>
+                <g fill="#111820" stroke="#2d3844" stroke-width="1.2">
+                  <rect x="16"  y="40"  width="112" height="56" rx="5"/>
+                  <rect x="16"  y="180" width="112" height="56" rx="5"/>
+                  <rect x="194" y="166" width="132" height="84" rx="5"/>
+                  <rect x="392" y="190" width="140" height="84" rx="5"/>
+                </g>
+                <rect x="392" y="40" width="140" height="84" rx="5" fill="#111820" stroke="#3f6ea8" stroke-width="1.3"/>
+                <rect x="548" y="190" width="58" height="84" rx="5" fill="none" stroke="#2d3844" stroke-width="1.2" stroke-dasharray="3 3"/>
+                <g text-anchor="middle">
+                  <g font-size="11.5" fill="#dde5ee">
+                    <text x="72"  y="64">USB 소켓</text>
+                    <text x="72"  y="204">벽면 어댑터</text>
+                    <text x="260" y="200">전원 변환기</text>
+                    <text x="462" y="76">두뇌</text>
+                    <text x="462" y="226">펌프 스위치</text>
+                    <text x="577" y="228">펌프</text>
+                  </g>
+                  <g font-size="9.5" fill="#6b7887">
+                    <text x="72"  y="80">노트북용</text>
+                    <text x="72"  y="220">12볼트 입력</text>
+                    <text x="260" y="217">전압을 두 번</text>
+                    <text x="260" y="231">낮춥니다</text>
+                    <text x="462" y="93">Wi-Fi가 내장된 컴퓨터</text>
+                    <text x="462" y="243">펌프마다 하나씩</text>
+                    <text x="577" y="244">보드 밖</text>
+                  </g>
+                </g>
+              </svg>
+            </div>
+            <p class="e-cap">전원은 왼쪽에서 들어와 오른쪽으로 흘러갑니다. 두뇌는 펌프를 직접 건드리지 않습니다 — 스위치에게 언제 작동할지만 알려주고, 강한 전류는 스위치가 처리합니다.</p>
+          </div>
+
+          <div class="e-sec">
+            <h3>제대로 되어 있나요?</h3>
+            <div class="e-check good">
+              <span class="e-dot"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
+              <div>
+                <div class="t">모든 연결에 갈 곳이 있습니다</div>
+                <div class="d">이 보드에는 96개의 연결이 있고, 96개 모두 양쪽 끝이 이어져 있습니다. 배선이 허공에 떠 있는 채로 남는 것이 처음 만든 보드가 아예 작동하지 않는 가장 흔한 원인이라, 다른 무엇보다 먼저 확인할 가치가 있습니다.</div>
+              </div>
+            </div>
+            <div class="e-check good">
+              <span class="e-dot"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
+              <div>
+                <div class="t">전원부는 새로 지어낸 게 아니라 검증된 것을 가져왔습니다</div>
+                <div class="d">전압을 낮추는 부분은 이런 보드에서 가장 까다로운 지점입니다. 처음부터 새로 설계하는 대신, 칩을 만든 회사가 직접 공개하고 실측한 회로 구성을 그대로 사용했습니다 — 짐작이 아니라 실제로 만들어져 검증된 하드웨어입니다.</div>
+              </div>
+            </div>
+            <div class="e-check good">
+              <span class="e-dot"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
+              <div>
+                <div class="t">부품 목록과 배선이 서로 일치합니다</div>
+                <div class="d">각 부품의 연결을 부품 목록과 대조해 확인했습니다. 한 가지 참고사항이 나왔는데, 펌프 단자 네 개의 방향 표기 방식입니다. 이는 오류가 아니라 표기상의 선택이므로, 표기에 맞춰 펌프를 연결하기만 하면 됩니다.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== LAYOUT VIEW ===== -->
+        <div class="view show" id="view-layout">
+          <div class="card">
+            <div class="card-hd">
+              보드 — 100 × 60 mm · 4 레이어
+              <span class="sp"></span>
+              <span class="meta">03_layout/board_layout.json</span>
+            </div>
+            <div class="card-bd" style="padding-bottom:9px">
+              <div class="chips" id="layerChips">
+                <span class="chip on" data-layer="top">상단 동박</span>
+                <span class="chip on" data-layer="bottom">하단 동박</span>
+                <span class="chip on" data-layer="silk">실크스크린</span>
+                <span class="chip on" data-layer="pads">패드 / 비아</span>
+                <span class="chip" data-layer="ratsnest">랫츠네스트</span>
+                <span class="chip" data-layer="mask">솔더마스크</span>
+              </div>
+            </div>
+            <div class="stage-viewport" style="height:330px">
+              <div class="vp-tools"><button class="mini-btn">3D</button><button class="mini-btn">맞춤</button></div>
+              <svg viewBox="0 0 600 360" width="100%" height="100%">
+                <rect width="600" height="360" fill="#080a0d"/>
+                <!-- board outline -->
+                <rect x="60" y="45" width="480" height="288" rx="7" fill="#0e2417" stroke="#2ecc71" stroke-width="1.4" opacity=".95"/>
+                <g id="lay-bottom" stroke="#7a4a22" stroke-width="2.6" fill="none" opacity=".75">
+                  <path d="M96 300 H504"/><path d="M96 78 V300"/><path d="M504 78 V300"/><path d="M96 78 H504"/>
+                  <path d="M160 120 H440"/><path d="M160 250 H440"/>
+                </g>
+                <g id="lay-top" stroke="#c87137" stroke-width="2.2" fill="none">
+                  <path d="M120 96 H210 V150"/>
+                  <path d="M120 130 H180 V210 H250"/>
+                  <path d="M350 110 H430 V96"/>
+                  <path d="M350 140 H468 V190"/>
+                  <path d="M350 170 H420 V262"/>
+                  <path d="M250 236 H180 V282 H300"/>
+                  <path d="M368 236 H452 V282"/>
+                  <path d="M120 190 H160 V172"/>
+                </g>
+                <g id="lay-pads" fill="#e0a35c">
+                  <circle cx="120" cy="96" r="3.4"/><circle cx="120" cy="130" r="3.4"/><circle cx="120" cy="190" r="3.4"/>
+                  <circle cx="430" cy="96" r="3.4"/><circle cx="468" cy="190" r="3.4"/><circle cx="452" cy="282" r="3.4"/>
+                  <circle cx="210" cy="150" r="3.4"/><circle cx="180" cy="282" r="3.4"/>
+                  <circle cx="90" cy="70" r="6" fill="none" stroke="#e0a35c" stroke-width="1.6"/>
+                  <circle cx="510" cy="70" r="6" fill="none" stroke="#e0a35c" stroke-width="1.6"/>
+                  <circle cx="90" cy="308" r="6" fill="none" stroke="#e0a35c" stroke-width="1.6"/>
+                  <circle cx="510" cy="308" r="6" fill="none" stroke="#e0a35c" stroke-width="1.6"/>
+                </g>
+                <g id="lay-silk" font-family="ui-monospace,monospace" font-size="8.5" fill="#dfe5ec">
+                  <rect x="250" y="110" width="100" height="126" rx="3" fill="#132029" stroke="#4f8cff" stroke-width="1.2"/>
+                  <text x="300" y="176" text-anchor="middle" fill="#cfe0ff" font-size="10">U1</text>
+                  <rect x="96" y="216" width="66" height="40" rx="3" fill="#132029" stroke="#2ecc71" stroke-width="1.1"/>
+                  <text x="129" y="240" text-anchor="middle" fill="#a7e8c4">U2</text>
+                  <rect x="96" y="152" width="52" height="34" rx="3" fill="#132029" stroke="#2ecc71" stroke-width="1.1"/>
+                  <text x="122" y="173" text-anchor="middle" fill="#a7e8c4">U3</text>
+                  <rect x="392" y="86" width="52" height="34" rx="3" fill="#132029" stroke="#f0b429" stroke-width="1.1"/><text x="418" y="107" text-anchor="middle" fill="#f3d894">U4</text>
+                  <rect x="392" y="130" width="52" height="34" rx="3" fill="#132029" stroke="#f0b429" stroke-width="1.1"/><text x="418" y="151" text-anchor="middle" fill="#f3d894">U5</text>
+                  <rect x="392" y="174" width="52" height="34" rx="3" fill="#132029" stroke="#f0b429" stroke-width="1.1"/><text x="418" y="195" text-anchor="middle" fill="#f3d894">U6</text>
+                  <rect x="392" y="218" width="52" height="34" rx="3" fill="#132029" stroke="#f0b429" stroke-width="1.1"/><text x="418" y="239" text-anchor="middle" fill="#f3d894">U7</text>
+                  <rect x="392" y="266" width="76" height="34" rx="3" fill="#132029" stroke="#a78bfa" stroke-width="1.1"/><text x="430" y="287" text-anchor="middle" fill="#cfc0ff">J2 USB-C</text>
+                  <rect x="96" y="272" width="76" height="34" rx="3" fill="#132029" stroke="#a78bfa" stroke-width="1.1"/><text x="134" y="293" text-anchor="middle" fill="#cfc0ff">J1 12V</text>
+                  <rect x="196" y="266" width="60" height="34" rx="3" fill="#132029" stroke="#a78bfa" stroke-width="1.1"/><text x="226" y="287" text-anchor="middle" fill="#cfc0ff">U8</text>
+                  <text x="300" y="326" text-anchor="middle" fill="#5d6b7a" font-size="8">P-SAY-B · COCKTAIL-ROBOT · REV A</text>
+                </g>
+                <g id="lay-rats" stroke="#4f8cff" stroke-width=".8" stroke-dasharray="3 3" opacity=".55" style="display:none">
+                  <path d="M300 176 L418 107"/><path d="M300 176 L418 151"/><path d="M300 176 L418 195"/><path d="M300 176 L418 239"/>
+                  <path d="M300 176 L226 283"/><path d="M129 240 L122 173"/>
+                </g>
+                <g id="lay-mask" style="display:none"><rect x="60" y="45" width="480" height="288" rx="7" fill="#0b6b3a" opacity=".22"/></g>
+                <!-- DRC hotspot -->
+                <circle id="drcSpot" cx="468" cy="190" r="13" fill="none" stroke="#ef4757" stroke-width="1.6" opacity=".9">
+                  <animate attributeName="r" values="10;16;10" dur="1.8s" repeatCount="indefinite"/>
+                  <animate attributeName="opacity" values=".9;.25;.9" dur="1.8s" repeatCount="indefinite"/>
+                </circle>
+              </svg>
+              <div class="vp-legend"><span><i style="background:#c87137"></i>상단 동박</span><span><i style="background:#7a4a22"></i>하단 동박</span><span><i style="background:#2ecc71"></i>보드 외곽선</span><span><i style="background:#ef4757"></i>DRC</span></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd">배치 지표<span class="sp"></span><span class="meta">autorouter · cv-place v0.4</span></div>
+            <div class="card-bd">
+              <div class="quote">
+                <div class="q-tile"><div class="lbl">면적 효율</div><div class="val">+17.4%</div></div>
+                <div class="q-tile"><div class="lbl">배선 완료</div><div class="val">96 / 96</div></div>
+                <div class="q-tile"><div class="lbl">비아</div><div class="val">78</div></div>
+                <div class="q-tile"><div class="lbl">최장 트레이스</div><div class="val">64.2 mm</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== LAYOUT VIEW · EASY ===== -->
+        <div class="view easy" id="view-layout-easy">
+          <h2>당신의 보드</h2>
+          <p class="e-def">이제 모든 부품이 실제 사각형 위에 실제 위치를 갖게 되었고, 배선 계획의 연결들이 구리 선으로 그려졌습니다.</p>
+
+          <div class="e-sec">
+            <div class="e-fig">
+              <svg viewBox="0 0 600 360" width="100%" height="100%" style="display:block">
+                <rect width="600" height="360" fill="#080a0d"/>
+                <rect x="60" y="45" width="480" height="288" rx="7" fill="#101a15" stroke="#3f6b52" stroke-width="1.3"/>
+                <g id="elay-wires">
+                  <g stroke="#6a4c33" stroke-width="2.4" fill="none" opacity=".7">
+                    <path d="M96 300 H504"/><path d="M96 78 V300"/><path d="M504 78 V300"/><path d="M96 78 H504"/>
+                    <path d="M160 120 H440"/><path d="M160 250 H440"/>
+                  </g>
+                  <g stroke="#8a6242" stroke-width="2.1" fill="none">
+                    <path d="M120 96 H210 V150"/><path d="M120 130 H180 V210 H250"/>
+                    <path d="M350 110 H430 V96"/><path d="M350 140 H468 V190"/>
+                    <path d="M350 170 H420 V262"/><path d="M250 236 H180 V282 H300"/>
+                    <path d="M368 236 H452 V282"/><path d="M120 190 H160 V172"/>
+                  </g>
+                  <g fill="#a5814f">
+                    <circle cx="120" cy="96" r="3.2"/><circle cx="120" cy="130" r="3.2"/><circle cx="120" cy="190" r="3.2"/>
+                    <circle cx="430" cy="96" r="3.2"/><circle cx="468" cy="190" r="3.2"/><circle cx="452" cy="282" r="3.2"/>
+                    <circle cx="210" cy="150" r="3.2"/><circle cx="180" cy="282" r="3.2"/>
+                  </g>
+                </g>
+                <g fill="none" stroke="#a5814f" stroke-width="1.4" opacity=".8">
+                  <circle cx="90" cy="70" r="6"/><circle cx="510" cy="70" r="6"/>
+                  <circle cx="90" cy="308" r="6"/><circle cx="510" cy="308" r="6"/>
+                </g>
+                <g fill="#141c24" stroke="#2f3b47" stroke-width="1.1">
+                  <rect x="250" y="110" width="100" height="126" rx="3"/>
+                  <rect x="96"  y="216" width="66"  height="40"  rx="3"/>
+                  <rect x="96"  y="152" width="52"  height="34"  rx="3"/>
+                  <rect x="392" y="86"  width="52"  height="34"  rx="3"/>
+                  <rect x="392" y="130" width="52"  height="34"  rx="3"/>
+                  <rect x="392" y="174" width="52"  height="34"  rx="3"/>
+                  <rect x="392" y="218" width="52"  height="34"  rx="3"/>
+                  <rect x="392" y="266" width="76"  height="34"  rx="3"/>
+                  <rect x="96"  y="272" width="76"  height="34"  rx="3"/>
+                  <rect x="196" y="266" width="60"  height="34"  rx="3"/>
+                </g>
+                <g text-anchor="middle" font-size="9" fill="#c2ccd8">
+                  <text x="300" y="176" font-size="11">두뇌</text>
+                  <text x="129" y="240">전원</text>
+                  <text x="122" y="173">전원</text>
+                  <text x="418" y="107">펌프 1</text>
+                  <text x="418" y="151">펌프 2</text>
+                  <text x="418" y="195">펌프 3</text>
+                  <text x="418" y="239">펌프 4</text>
+                  <text x="430" y="288">USB</text>
+                  <text x="134" y="293">전원 입력</text>
+                  <text x="226" y="288">센서</text>
+                  <text x="300" y="326" font-size="8.5" fill="#5d6b7a">칵테일 로봇</text>
+                </g>
+                <circle id="eDrcSpot" cx="468" cy="190" r="13" fill="none" stroke="#cf7581" stroke-width="1.5" opacity=".85">
+                  <animate attributeName="r" values="10;16;10" dur="1.8s" repeatCount="indefinite"/>
+                  <animate attributeName="opacity" values=".85;.22;.85" dur="1.8s" repeatCount="indefinite"/>
+                </circle>
+              </svg>
+              <div class="e-legend">
+                <span><i style="background:#8a6242"></i>구리 배선</span>
+                <span><i style="background:#2f3b47"></i>부품</span>
+                <span><i style="background:#cf7581"></i>수정이 필요함</span>
+              </div>
+            </div>
+            <div class="chips" style="margin-top:11px">
+              <span class="chip on" id="eWireChip">배선 표시</span>
+            </div>
+          </div>
+
+          <div class="e-sec">
+            <h3>보드 자체</h3>
+            <div class="e-metric">
+              <div><div class="v">100 × 60 mm</div><div class="l">은행 카드 한 장 반을 나란히 놓은 정도</div></div>
+              <div><div class="v">두께 1.6 mm</div><div class="l">신용카드 두 장을 겹친 정도</div></div>
+              <div><div class="v">4개 레이어</div><div class="l">배선이 건물의 층처럼 네 겹으로 쌓여 있어서 서로 교차할 일이 없습니다</div></div>
+              <div><div class="v">96개 모두 연결됨</div><div class="l">배선 계획의 모든 연결이 이제 실제 구리 선이 되었습니다</div></div>
+            </div>
+          </div>
+
+          <div class="e-sec">
+            <h3>왜 이 자리에 놓였는지</h3>
+            <p><strong>펌프 스위치 네 개는 한쪽 가장자리에 모여 있습니다.</strong> 펌프가 돌아가는 동안 이 부품들은 열을 냅니다. 같은 구리판을 공유하며 모여 있으면 열이 한 부품 아래에 쌓이지 않고 넓게 퍼져 빠져나갈 수 있습니다.</p>
+            <p><strong>소켓들은 바깥쪽을 향합니다.</strong> 전원 소켓과 노트북 소켓 모두 가장자리에 있어서, 보드가 케이스 안에 들어가도 케이블이 닿을 수 있습니다.</p>
+            <p><strong>구리 선 중 일부는 더 두껍습니다.</strong> 가장 두꺼운 선들이 펌프에 전원을 공급합니다. 전류가 많이 흐르는 가는 선은 뜨거워지기 때문에, 짐작이 아니라 실제 부하에 맞춰 굵기를 정했습니다.</p>
+            <p class="e-note" id="eLayNote">위 그림에 동그라미 친 지점이 하나 있습니다. 이 보드에서 유일한 문제이며, 다음 탭에서 원인을 설명하고 고칩니다.</p>
+          </div>
+        </div>
+
+        <!-- ===== FAB VIEW ===== -->
+        <div class="view" id="view-fab">
+          <div class="card">
+            <div class="card-hd">
+              거버 미리보기
+              <span class="sp"></span>
+              <span class="meta">04_fab/gerber_output.zip · 파일 11개</span>
+              <button class="mini-btn">다운로드</button>
+            </div>
+            <div class="stage-viewport" style="height:250px">
+              <svg viewBox="0 0 600 260" width="100%" height="100%">
+                <rect width="600" height="260" fill="#080a0d"/>
+                <rect x="70" y="24" width="460" height="212" rx="6" fill="#0b6b3a" opacity=".85"/>
+                <g fill="#d9a441" opacity=".95">
+                  <rect x="250" y="70" width="96" height="110" rx="2" opacity=".5"/>
+                  <circle cx="110" cy="48" r="5"/><circle cx="490" cy="48" r="5"/><circle cx="110" cy="212" r="5"/><circle cx="490" cy="212" r="5"/>
+                  <rect x="380" y="60" width="46" height="26" rx="2"/><rect x="380" y="98" width="46" height="26" rx="2"/>
+                  <rect x="380" y="136" width="46" height="26" rx="2"/><rect x="380" y="174" width="46" height="26" rx="2"/>
+                  <rect x="98" y="170" width="60" height="34" rx="2"/><rect x="98" y="110" width="46" height="28" rx="2"/>
+                </g>
+                <g fill="none" stroke="#f6f7f9" stroke-width="1" opacity=".55" font-family="ui-monospace,monospace" font-size="8">
+                  <rect x="250" y="70" width="96" height="110" rx="2"/>
+                  <text x="298" y="128" fill="#f6f7f9" text-anchor="middle" stroke="none" font-size="9">U1</text>
+                  <text x="300" y="228" fill="#f6f7f9" text-anchor="middle" stroke="none" font-size="7.5">P-SAY-B COCKTAIL-ROBOT REV A</text>
+                </g>
+              </svg>
+              <div class="vp-legend"><span>탑 어셈블리 · 4L · 1.6 mm FR-4 · HASL</span></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd">
+              DRC 리포트
+              <span class="sp"></span>
+              <span class="meta" id="drcMeta">오류 1건 · 경고 2건</span>
+              <button class="mini-btn" id="btnRerunDrc">DRC 다시 실행</button>
+            </div>
+            <div id="drcList">
+              <div class="issue err"><div class="ic"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.8v4.8M12 16v.01"/></svg></div><div class="txt">간격 위반 — <b>+12V</b>와 <b>PUMP4_OUT2</b> 사이 0.14 mm (최소 0.20 mm 필요)<div class="loc">layout: 46.8, 22.1 · net +12V · via V63</div></div></div>
+              <div class="issue warn"><div class="ic"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5 21 20H3z"/><path d="M12 10.5v3.4M12 16.8v.01"/></svg></div><div class="txt">U2 노출 패드에 서멀 릴리프 누락<div class="loc">layout: 12.4, 41.0 · ref U2</div></div></div>
+              <div class="issue warn"><div class="ic"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5 21 20H3z"/><path d="M12 10.5v3.4M12 16.8v.01"/></svg></div><div class="txt">J1.2 패드 위에 실크스크린 겹침<div class="loc">layout: 9.2, 52.6 · ref J1</div></div></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd">JLCPCB 실시간 견적<span class="sp"></span><span class="meta">실시간 · 14초 전 조회</span></div>
+            <div class="card-bd">
+              <div class="quote">
+                <div class="q-tile"><div class="lbl">보드 수</div><div class="val">5개</div></div>
+                <div class="q-tile"><div class="lbl">사양</div><div class="val" style="font-size:13px">4L · 1.6 mm · HASL</div></div>
+                <div class="q-tile"><div class="lbl">제작 기간</div><div class="val">3일</div></div>
+                <div class="q-tile"><div class="lbl">총액</div><div class="val big">$28.40</div></div>
+              </div>
+              <button class="order-btn" id="btnOrder" disabled>DRC 오류 1건을 해결하면 주문 가능</button>
+              <div style="font-size:10.5px;color:var(--muted);margin-top:9px;text-align:center">
+                JLCPCB API로 <code style="font-family:var(--mono)">gerber_output.zip</code> + <code style="font-family:var(--mono)">order_payload.json</code> 업로드
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== FAB VIEW · EASY ===== -->
+        <div class="view easy" id="view-fab-easy">
+          <h2>제작 맡기기</h2>
+          <p class="e-def">설계 데이터는 공장으로 보내지고, 공장은 보드를 인쇄해 배송해 줍니다. 그 전에 배치 전체를 망칠 수 있는 실수가 없는지 먼저 확인합니다.</p>
+
+          <div class="e-sec">
+            <div class="e-fig">
+              <svg viewBox="0 0 600 250" width="100%" height="100%" style="display:block">
+                <rect width="600" height="250" fill="#080a0d"/>
+                <rect x="70" y="22" width="460" height="206" rx="6" fill="#14432c"/>
+                <g fill="#b08a5f" opacity=".9">
+                  <circle cx="110" cy="46" r="5"/><circle cx="490" cy="46" r="5"/>
+                  <circle cx="110" cy="204" r="5"/><circle cx="490" cy="204" r="5"/>
+                  <rect x="380" y="58"  width="46" height="26" rx="2"/>
+                  <rect x="380" y="96"  width="46" height="26" rx="2"/>
+                  <rect x="380" y="134" width="46" height="26" rx="2"/>
+                  <rect x="380" y="172" width="46" height="26" rx="2"/>
+                  <rect x="98"  y="166" width="60" height="34" rx="2"/>
+                  <rect x="98"  y="108" width="46" height="28" rx="2"/>
+                </g>
+                <rect x="250" y="68" width="96" height="108" rx="2" fill="#0f3322" stroke="#e8ecf1" stroke-width="1" opacity=".8"/>
+                <g text-anchor="middle" fill="#e8ecf1" font-size="9" opacity=".85">
+                  <text x="298" y="126">두뇌</text>
+                  <text x="403" y="222" font-size="8">펌프</text>
+                  <text x="300" y="240" font-size="8" fill="#5d6b7a">칵테일 로봇</text>
+                </g>
+              </svg>
+            </div>
+            <p class="e-cap">대략 이런 모습으로 도착합니다: 부품이 이미 납땜된 초록색 사각 보드입니다. 나사 단자에 펌프를 연결하고 어댑터를 꽂으면 됩니다.</p>
+          </div>
+
+          <div class="e-sec">
+            <h3>안전 점검</h3>
+            <p class="e-note tight">보드의 모든 선과 간격을 공장이 실제로 인쇄할 수 있는 수준인지 측정합니다.</p>
+            <div id="eDrcList">
+              <div class="e-check bad">
+                <span class="e-dot"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 7v6M12 16.6v.01"/></svg></span>
+                <div>
+                  <div class="t">전원선 두 개가 너무 가깝게 지나갑니다</div>
+                  <div class="d">세 번째 펌프 스위치 옆에서, 12볼트가 흐르는 선 하나가 다른 선과 머리카락 굵기만큼 가깝게 지나갑니다. 인쇄는 완벽하게 정밀할 수 없어서 이렇게 가까운 선은 결국 맞닿을 수 있고, 두 선이 맞닿으면 보드가 합선되어 멈춥니다. 간격을 지금의 약 두 배로 늘려야 합니다.</div>
+                </div>
+              </div>
+              <div class="e-check mute">
+                <span class="e-dot"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 11v6M12 7.4v.01"/></svg></span>
+                <div>
+                  <div class="t">사소한 참고사항 두 가지</div>
+                  <div class="d">인쇄된 라벨이 금속 접점 하나를 살짝 침범했고, 부품 하나는 방열 연결을 더 깔끔하게 할 수 있습니다. 둘 다 보드 작동에는 영향이 없고, 공장에서 매일 보는 흔한 경우입니다.</div>
+                </div>
+              </div>
+            </div>
+            <button class="e-btn" id="eBtnRecheck" style="margin-top:16px">보드 다시 확인</button>
+          </div>
+
+          <div class="e-sec">
+            <h3>받게 될 것</h3>
+            <div class="e-metric">
+              <div><div class="v">보드 5장</div><div class="l">주문할 가치가 있는 최소 수량</div></div>
+              <div><div class="v">약 3일</div><div class="l">제작 후 배송 시작까지</div></div>
+              <div><div class="v">$28.40</div><div class="l">다섯 장 전체, 인쇄와 드릴 가공 포함</div></div>
+              <div><div class="v">초록색, 1.6 mm</div><div class="l">추가 비용 없는 표준 마감</div></div>
+            </div>
+            <button class="e-btn wide" id="eOrderBtn" disabled>먼저 문제 하나를 해결하세요</button>
+            <p class="e-note">저 버튼을 누르기 전까지는 아무것도 전송되지 않습니다. 보드에 아직 문제가 있는 동안은 주문을 막아둡니다 — 공장은 잘못된 설계도 흔쾌히 인쇄해 버리고, 문제는 소포가 도착해서야 알게 될 테니까요.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===================== STATUS BAR ===================== -->
+  <footer class="statusbar">
+    <span class="sp"></span>
+    <span class="path" id="sbPath">C:\Users\iannl\psayb-projects\cocktail-robot</span>
+    <span>UTF-8</span>
+    <span id="sbStage">LAYOUT</span>
+  </footer>
+</div>
+
+<!-- ===================== MENUS ===================== -->
+<div class="menu" id="menuModel"></div>
+<div class="menu" id="menuStage"></div>
+<div class="menu" id="menuTarget">
+  <div class="mi" data-t="로컬"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="4.5" width="19" height="13" rx="1.8"/><path d="M9 21h6" stroke-linecap="round"/></svg><div>로컬<span class="sub">이 기기에서 EDA 툴체인 실행</span></div></div>
+  <div class="mi" data-t="클라우드"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M17.5 19H7a4 4 0 0 1-.9-7.9A6 6 0 0 1 18 10.1a4.5 4.5 0 0 1-.5 8.9z"/></svg><div>클라우드<span class="sub">GPU 자동배선 · 500 TPS 풀</span></div></div>
+</div>
+<div class="menu" id="menuFolder">
+  <div class="mi" id="miNewProject">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+    <div>새 프로젝트<span class="sub">디렉터리 선택 · .psayb/ 생성</span></div>
+  </div>
+  <div class="mi" id="miQuickStart">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M13 2L4.5 13H11l-1 9 8.5-11H12z"/></svg>
+    <div>빠른 시작<span class="sub">~/psayb-projects/project-&lt;ts&gt;/</span></div>
+  </div>
+</div>
+<div class="menu" id="menuProject"></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =============================================================
+   Mock data
+   ============================================================= */
+const MODELS = [
+  {id:'gemini-3.1-pro',  name:'Gemini 3.1 Pro',        tier:'High', sub:'외부 · Plan 추론에 최적'},
+  {id:'claude-opus-5',   name:'Claude Opus 5',         tier:'High', sub:'외부 · 긴 컨텍스트 데이터시트 처리'},
+  {id:'psayb-hw-7b',     name:'자체 하드웨어 LLM',      tier:'RAG',  sub:'로컬 · 참조 설계 4만1천 건'},
+  {id:'psayb-cv-route',  name:'P-say-B CV 라우터',      tier:'CV',   sub:'로컬 · 배치 + 자동배선 비전'},
+];
+
+const STAGES = [
+  {id:'PLAN',      label:'기획',   color:'#69a1ff', sub:'요구사항 → BOM'},
+  {id:'SCHEMATIC', label:'회로도', color:'#a78bfa', sub:'넷리스트 합성 (RAG)'},
+  {id:'LAYOUT',    label:'레이아웃', color:'#2ecc71', sub:'배치 & 배선 (CV)'},
+  {id:'FAB',       label:'제작',   color:'#f0b429', sub:'DRC · 거버 · 주문'},
+];
+
+const SLASH = [
+  {k:'/plan',          d:'요구사항 + BOM 재생성'},
+  {k:'/schematic',     d:'BOM으로부터 넷리스트 합성'},
+  {k:'/layout',        d:'보드 배치 & 자동배선'},
+  {k:'/fab',           d:'거버 내보내기 + 견적'},
+  {k:'/drc-check',     d:'디자인 룰 체크 실행'},
+  {k:'/export-gerber', d:'gerber_output.zip 작성'},
+  {k:'/fork',          d:'이 프로젝트를 새 워크스페이스로 분기'},
+];
+
+const MENTIONS = [
+  {k:'@bom.json',       d:'01_plan · 14줄'},
+  {k:'@netlist.json',   d:'02_schematic · 96 nets'},
+  {k:'@board_layout.json', d:'03_layout · 4개 레이어'},
+  {k:'@drc_rules',      d:'IPC-2221 Class 2'},
+  {k:'@ESP32-WROOM-32E',d:'부품 · U1'},
+  {k:'@DRV8871',        d:'부품 · U4..U7'},
+  {k:'@datasheet.pdf',  d:'첨부파일 · 42페이지'},
+];
+
+const BOM = [
+  ['U1','ESP32-WROOM-32E','SMD-38',1,'3.84','ok','18,204'],
+  ['U2','MP1584EN','SOIC-8-EP',1,'0.62','ok','9,510'],
+  ['U3','AMS1117-3.3','SOT-223',1,'0.11','ok','120k+'],
+  ['U4-U7','DRV8871DDAR','SO-8-PowerPAD',4,'1.94','low','842'],
+  ['U8','TCA9548APWR','TSSOP-24',1,'1.12','ok','6,330'],
+  ['J1','DC barrel 5.5×2.1','TH',1,'0.24','ok','44k'],
+  ['J2','USB-C 16P receptacle','SMD',1,'0.31','ok','31k'],
+  ['J3-J6','Screw terminal 2P 5 mm','TH',4,'0.18','ok','88k'],
+  ['L1','10 µH 3 A shielded','1210',1,'0.15','ok','22k'],
+  ['D1','SS34 Schottky','SMA',1,'0.05','ok','96k'],
+  ['C1-C8','100 nF X7R 50 V','0603',8,'0.004','ok','1M+'],
+  ['C9-C12','22 µF 25 V X5R','1206',4,'0.09','ok','54k'],
+  ['R1-R10','10 kΩ 1%','0603',10,'0.002','ok','1M+'],
+  ['PCB','4L 100×60 mm 1.6 mm HASL','—',1,'5.68','ok','—'],
+];
+
+/* NOTE: a project has NO stage of its own. The pipeline stage is a property of
+   each conversation — a single workspace holds Plan, Schematic, Layout and Fab
+   threads side by side. Conversations are ordered newest-first. */
+const PROJECTS = [
+  {id:'cocktail-robot', name:'칵테일 로봇', path:'C:\\Users\\iannl\\psayb-projects\\cocktail-robot', open:true, sessions:[
+    {id:'s3', title:'4레이어 배치 & 배선',         age:'2시간 전',  stage:'LAYOUT',    model:'psayb-cv-route', locked:true},
+    {id:'s2', title:'펌프 드라이버 넷리스트 합성', age:'5일 전',  stage:'SCHEMATIC', model:'psayb-hw-7b',    locked:true},
+    {id:'s1', title:'음료 디스펜서 요구사항',  age:'2개월 전', stage:'PLAN',      model:'gemini-3.1-pro', locked:true},
+  ]},
+  {id:'ai-camera', name:'AI 카메라', path:'C:\\Users\\iannl\\psayb-projects\\ai-camera', open:false, sessions:[
+    {id:'s5', title:'주문 전 DRC 정리',     age:'6일 전', stage:'FAB',  model:'psayb-cv-route', locked:true},
+    {id:'s4', title:'이미지 센서 전력 예산',    age:'3주 전', stage:'PLAN', model:'gemini-3.1-pro', locked:true},
+  ]},
+  {id:'self-driving-mini-car', name:'자율주행 미니카', path:'C:\\Users\\iannl\\psayb-projects\\self-driving-mini-car', open:false, sessions:[
+    {id:'s6', title:'모터 드라이버 + 휠 엔코더', age:'1일 전', stage:'PLAN', model:'claude-opus-5', locked:true},
+  ]},
+];
+
+/* seeded conversation content per session */
+const THREADS = {
+  s3:[
+    {r:'user', t:'보드를 배치하고 배선해 줘. 100×60mm, 4레이어 이내로 하고, 12V 펌프 레일은 폭을 넉넉하게 줘. 펌프는 오른쪽 가장자리에, USB-C는 오른쪽 아래에 배치해 줘.'},
+    {r:'ai', model:'P-say-B CV Router', steps:[
+      {n:'load_artifacts', out:'02_schematic/netlist.json → 96 nets, 214 pins\n01_plan/bom.json → 14 lines, all footprints resolved'},
+      {n:'cv_place', out:'placement pass 1 … 214 pins\nthermal cluster: U4..U7 grouped right edge (Δt 11 °C)\nplacement score 0.91 · area 100.0 × 60.0 mm'},
+      {n:'autoroute', out:'layer stack: SIG / GND / PWR / SIG\nrouted 96/96 nets · 78 vias · longest 64.2 mm\narea efficiency vs. reference autorouter: +17.4%'},
+    ], t:`<p>보드 배치와 배선을 <strong>100 × 60 mm, 4레이어</strong>로 모두 마쳤습니다.</p>
+      <ul>
+        <li><strong>U4–U7</strong>(DRV8871 펌프 드라이버)은 오른쪽 가장자리에 배치했고, 방열을 위해 구리 영역을 공유합니다.</li>
+        <li><strong>+12V</strong>는 PWR 레이어에서 1.20 mm, +5V는 0.80 mm, 신호선은 0.25 mm로 배선했습니다.</li>
+        <li><strong>J2(USB-C)</strong>는 오른쪽 아래에 배치했고, D± 페어는 0.1 mm 이내로 길이를 맞췄습니다.</li>
+      </ul>
+      <p>배선 자체는 깔끔하지만, 사전 DRC에서 비아 V63 근처에 <strong>간격 오류 1건</strong>이 확인됐습니다 — +12V 구리 영역이 PUMP4_OUT2와 0.14 mm까지 가까워집니다. <code>제작</code> 탭에서 확인하거나, 제작 대화를 새로 시작해 수정 후 주문할 수 있습니다.</p>`,
+     arts:['03_layout/board_layout.json','03_layout/drc_report.json']},
+  ],
+  s1:[
+    {r:'user', t:'칵테일 로봇용 컨트롤러 보드를 만들고 싶어. 12V 연동 펌프 4개를 구동하고, Wi-Fi로 통신하고, 펌웨어용 USB-C 포트가 있어야 해. 비전문가라서 — 적당한 부품을 골라줘.'},
+    {r:'ai', model:'Gemini 3.1 Pro (High)', steps:[
+      {n:'extract_requirements', out:'domain: motor control + wireless\nrails: 12 V in → 5 V → 3.3 V\nloads: 4 × 400 mA inductive'},
+      {n:'resolve_bom', out:'queried 52,418 indexed parts across 6 vendors\n14 lines resolved · 0 unresolved · avg lead 0 days'},
+    ], t:`<p>계획은 이렇습니다. Wi-Fi + BLE용으로 <strong>ESP32-WROOM-32E</strong>를 선택했고(모듈이라 RF 레이아웃 위험이 없습니다), 펌프용으로는 <strong>DRV8871</strong> H-브리지를 골랐습니다 — 인덕티브 킥백을 자체적으로 처리합니다.</p>
+      <ul><li>전원: 12V 배럴 잭 → <code>MP1584EN</code> 벅 컨버터로 5V → <code>AMS1117-3.3</code> LDO.</li>
+      <li>BOM 14개 항목 모두 재고가 있고, 5개 기준 개당 단가는 <strong>$18.62</strong>입니다.</li></ul>
+      <p>기획 탭에서 BOM 표를 확인하세요. 괜찮아 보이면 회로도 대화를 새로 시작하면 됩니다.</p>`,
+     arts:['01_plan/requirements.json','01_plan/bom.json']},
+  ],
+  s2:[
+    {r:'user', t:'@bom.json으로 회로도를 합성해 줘. 벅 컨버터는 참조 설계가 있으면 그걸 써 줘.'},
+    {r:'ai', model:'In-house Hardware LLM', steps:[
+      {n:'rag_retrieve', out:'vector search over 41,208 open-source designs\ntop match: MP1584 EVB rev C (cosine 0.94)\ntop match: ESP32 DevKit-C power section (0.91)'},
+      {n:'synthesize_netlist', out:'96 nets · 214 pins · 0 floating\nBOM→pin mapping accuracy 99.1%'},
+    ], t:`<p>넷리스트 합성을 마쳤습니다 — <strong>96개 net, 214개 pin, 뜬 배선 없음</strong>. 벅 컨버터 부분은 MP1584 평가보드를 거의 그대로 따랐는데, 이게 안전한 선택입니다.</p>
+      <p>BOM 대비 핀 매핑 정확도는 <strong>99.1%</strong>이고, 유일하게 표시된 항목은 J3–J6 극성 표기 방식인데 오류가 아니라 표기 관례입니다. 회로도 탭에 다이어그램과 넷 인스펙터가 있습니다.</p>`,
+     arts:['02_schematic/schematic.svg','02_schematic/netlist.json']},
+  ],
+};
+
+/* canned assistant replies for new messages, per stage */
+const REPLIES = {
+  PLAN:{steps:[
+    {n:'extract_requirements', out:'parsed constraints → 6 electrical, 2 mechanical\nambiguity check: 0 blocking'},
+    {n:'resolve_bom', out:'vendor query across 52,418 parts (0.31 s)\n14 lines · 0 unresolved · unit $18.62 @ 5 pcs'},
+  ], t:`<p>계획을 업데이트하고 실시간 벤더 재고를 기준으로 BOM을 다시 확인했습니다.</p>
+    <ul><li>모든 항목이 재고 있음 상태이지만, <strong>DRV8871</strong>이 주 벤더에서 842개로 줄어서 대체 공급처를 하나 지정해 두었습니다.</li>
+    <li>단가는 5개 기준 <strong>$18.62</strong>로 그대로입니다.</li></ul>
+    <p>기획 탭에 변경사항이 반영되어 있습니다. 준비되시면 언제든 회로도 대화를 시작하세요.</p>`,
+   arts:['01_plan/bom.json'], tab:'plan'},
+
+  SCHEMATIC:{steps:[
+    {n:'rag_retrieve', out:'vector search · 41,208 reference designs\n3 candidate topologies · best cosine 0.93'},
+    {n:'synthesize_netlist', out:'96 nets · 214 pins · 0 floating\npin-map accuracy 99.1%'},
+    {n:'erc_check', out:'ERC: 0 errors, 1 note (J3-J6 polarity convention)'},
+  ], t:`<p>현재 BOM을 기준으로 넷리스트를 다시 생성했습니다 — <strong>96개 net, 뜬 핀 0개</strong>, ERC 통과.</p>
+    <p>검색된 참조 설계가 스위칭 레귤레이터 부분을 다루고 있어서, 피드백 분배기와 보상 값은 지어낸 것이 아니라 검증된 보드에서 가져왔습니다. 다이어그램은 회로도 탭에서 바로 확인할 수 있습니다.</p>`,
+   arts:['02_schematic/netlist.json'], tab:'schematic'},
+
+  LAYOUT:{steps:[
+    {n:'cv_place', out:'placement pass 2 · score 0.93\nthermal cluster preserved · area 100.0 × 60.0 mm'},
+    {n:'autoroute', out:'routed 96/96 · 78 vias · longest 64.2 mm\narea efficiency +17.4% vs. reference'},
+  ], t:`<p>다시 배치하고 다시 배선했습니다. <strong>96/96개 net 배선 완료</strong>, 비아 78개, 일반 자동배선기 대비 면적 효율 <strong>+17.4%</strong>.</p>
+    <p>비아 V63 근처에 간격 문제 하나가 아직 남아 있습니다 — 보드 뷰에서 빨간색으로 표시되어 있습니다.</p>`,
+   arts:['03_layout/board_layout.json'], tab:'layout'},
+
+  FAB:{steps:[
+    {n:'run_drc', out:'IPC-2221 Class 2 · 1,842 checks\n1 error, 2 warnings'},
+    {n:'export_gerber', out:'RS-274X + NC drill · 11 files · 412 KB'},
+    {n:'jlc_quote', out:'4L · 1.6 mm · HASL · 5 pcs → $28.40 · 3 days'},
+  ], t:`<p>거버를 내보내고 견적도 받았습니다: <strong>보드 5장에 $28.40, 제작 기간 3일</strong>.</p>
+    <p>주문 버튼은 간격 오류가 해결될 때까지 비활성 상태로 둡니다 — DRC를 통과하지 못한 보드는 보내지 않습니다. 구리 영역을 수정한 뒤 제작 탭에서 <strong>DRC 다시 실행</strong>을 누르면 잠금이 풀립니다.</p>`,
+   arts:['04_fab/gerber_output.zip','04_fab/order_payload.json'], tab:'fab'},
+};
+
+/* =============================================================
+   DEMO SCRIPT
+   Beats keyed to the prompts in script.md. The first entry whose stage
+   matches the locked conversation AND whose `match` hits the typed text
+   wins; anything unscripted falls back to the generic REPLIES above, so
+   an off-script prompt on camera still answers sensibly.
+   ============================================================= */
+const SCRIPT = [
+  { stage:'PLAN', match:/cocktail|pump|drink|bartend|robot/i, tab:'plan',
+    steps:[
+      {n:'extract_requirements', out:'input: natural language, 3 sentences\nresolved: 6 electrical constraints, 2 mechanical\nrails: 12 V in -> 5 V -> 3.3 V\nloads: 4 x inductive, 400 mA nominal\nblocking ambiguities: 0'},
+      {n:'resolve_bom', out:'vendor query across 52,418 indexed parts (0.31 s)\n14 lines resolved - 0 unresolved\nsecond source pinned on 2 lines\nunit cost $18.62 @ 5 pcs'},
+    ],
+    t:`<p>계획은 이렇습니다. 무선 기능이 있는 모터 제어 보드를 말씀하셔서, 위험 부담이 큰 작업은 최대한 덜어내는 방향으로 부품을 골랐습니다.</p>
+      <ul>
+        <li>Wi-Fi와 BLE용으로 <strong>ESP32-WROOM-32E</strong> — 사전 인증된 모듈이라 RF 레이아웃에서 실수할 일이 없습니다.</li>
+        <li>펌프용으로 <strong>DRV8871</strong> H-브리지. 연동 펌프는 인덕티브 부하라, 이 부품이 플라이백을 자체적으로 클램프해서 외부 다이오드가 필요 없습니다.</li>
+        <li>전원 체인: 12V 배럴 잭 → <code>MP1584EN</code> 벅 컨버터로 5V → 로직용 <code>AMS1117-3.3</code> LDO.</li>
+      </ul>
+      <p>지금 기준 14개 항목 모두 재고가 있고, 단가는 <strong>보드 5장 기준 $18.62</strong>입니다. BOM은 기획 탭에 있습니다 — 부품을 확인하시고, 괜찮으시면 회로도 대화를 시작해 주세요.</p>`,
+    arts:['01_plan/requirements.json','01_plan/bom.json'] },
+
+  { stage:'SCHEMATIC', match:/schematic|netlist|bom\.json|reference design/i, tab:'schematic',
+    steps:[
+      {n:'rag_retrieve', out:'vector search over 41,208 open-source designs\nMP1584 evaluation board rev C - cosine 0.94\nESP32 DevKit-C power section - cosine 0.91\nDRV8871 EVM - cosine 0.89'},
+      {n:'synthesize_netlist', out:'96 nets - 214 pins - 0 floating\nBOM -> pin mapping accuracy 99.1%\ndifferential pair USB_DP/USB_DM matched to 0.1 mm'},
+      {n:'erc_check', out:'ERC: 0 errors, 1 note\nnote: J3-J6 polarity is a convention choice, not a fault'},
+    ],
+    t:`<p>넷리스트 합성을 마쳤습니다 — <strong>96개 net, 214개 pin, 뜬 배선 없음</strong>, ERC도 통과했습니다.</p>
+      <p>피드백 네트워크를 지어내지 말라고 하셔서 그렇게 하지 않았습니다: 스위칭 레귤레이터 부분은 요구사항 대비 0.94점을 받은 <strong>MP1584 평가보드</strong>에서 그대로 가져왔습니다. 분배기와 보상 값은 실제로 만들어져 실측된 하드웨어에서 나온 것입니다.</p>
+      <p>BOM 대비 핀 매핑 정확도는 <strong>99.1%</strong>입니다. 다이어그램과 넷 인스펙터는 회로도 탭에 있습니다.</p>`,
+    arts:['02_schematic/schematic.svg','02_schematic/netlist.json'] },
+
+  { stage:'LAYOUT', match:/place|route|layout|board|mm|edge/i, tab:'layout',
+    steps:[
+      {n:'load_artifacts', out:'02_schematic/netlist.json -> 96 nets, 214 pins\n01_plan/bom.json -> 14 lines, all footprints resolved'},
+      {n:'cv_place', out:'placement pass 1 -> score 0.87\nplacement pass 2 -> score 0.93\nthermal cluster: U4..U7 grouped on right edge (delta-t 11 C)\nboard 100.0 x 60.0 mm - within your budget'},
+      {n:'autoroute', out:'stackup: SIG / GND / PWR / SIG\nrouted 96/96 nets - 78 vias - longest trace 64.2 mm\n+12V at 1.20 mm, +5V at 0.80 mm, signals at 0.25 mm\narea efficiency vs conventional autorouter: +17.4%'},
+    ],
+    t:`<p><strong>100 × 60 mm, 4레이어</strong>로 배치와 배선을 모두 마쳤습니다 — 주신 제약조건을 모두 만족합니다.</p>
+      <ul>
+        <li>요청하신 대로 <strong>U4–U7</strong>을 오른쪽 가장자리에 배치했고, 구리 영역을 공유해서 서로 열 간섭 없이 방열합니다.</li>
+        <li><strong>J2(USB-C)</strong>는 오른쪽 아래에 배치했고, D± 페어는 0.1 mm 이내로 길이를 맞췄습니다.</li>
+        <li>12V 레일은 <strong>1.20 mm</strong>로 배선했습니다 — 짐작이 아니라 2.4A 피크 전류에 맞춰 계산한 값입니다.</li>
+      </ul>
+      <p>일반 자동배선기 대비 면적 효율은 <strong>+17.4%</strong>입니다. 한 가지 알려드릴 점은, 사전 DRC에서 비아 V63 근처에 <strong>간격 문제</strong>가 발견되어 보드에 빨간색으로 표시되어 있다는 겁니다. 주문 전에 처리하시는 걸 권합니다.</p>`,
+    arts:['03_layout/board_layout.json','03_layout/drc_report.json'] },
+
+  { stage:'FAB', match:/fix|clearance|pour|re-?run/i, tab:'fab', fx:'fixDrc',
+    steps:[
+      {n:'adjust_pour', out:'+12V pour pulled back near V63\nclearance 0.14 mm -> 0.24 mm (min 0.20 mm)\nno nets rerouted - copper only'},
+      {n:'run_drc', out:'IPC-2221 Class 2 - 1,842 checks\n0 errors, 2 warnings'},
+    ],
+    t:`<p>수정했습니다. V63 근처의 +12V 구리 영역을 뒤로 물렸습니다 — 간격이 0.14 mm에서 <strong>0.24 mm</strong>로 늘어나 최소 기준인 0.20 mm를 넉넉히 넘습니다. 배선은 다시 배선하지 않았으니 보드의 나머지 부분은 그대로입니다.</p>
+      <p>DRC는 이제 <strong>오류 0건</strong>입니다. 경고 2건이 남아 있지만 둘 다 미관상 문제입니다 — 서멀 릴리프 누락과 실크스크린 겹침 — 어느 것도 제작을 막지 않습니다.</p>
+      <p>주문 잠금이 해제되었습니다. 제작 탭에서 바로 주문 버튼을 누르실 수 있습니다.</p>`,
+    arts:['04_fab/drc_report.json'] },
+
+  { stage:'FAB', match:/drc|gerber|quote|order|five|5 board/i, tab:'fab',
+    steps:[
+      {n:'run_drc', out:'IPC-2221 Class 2 - 1,842 checks\n1 error, 2 warnings\nerror: clearance 0.14 mm between +12V and PUMP4_OUT2 at via V63'},
+      {n:'export_gerber', out:'RS-274X + NC drill - 11 files - 412 KB\ngerber_output.zip written to 04_fab/'},
+      {n:'jlc_quote', out:'JLCPCB API - 4 layer, 1.6 mm FR-4, HASL\n5 pcs -> $28.40 - lead time 3 days'},
+    ],
+    t:`<p>거버를 내보내고 견적도 받았습니다: <strong>보드 5장에 $28.40, 제작 기간 3일</strong>, 1.6 mm FR-4 4레이어입니다.</p>
+      <p>하지만 아직 주문하시게 둘 수는 없습니다. DRC에서 아직 <strong>오류 1건</strong>이 나옵니다 — 비아 V63의 0.14 mm 간격 문제인데, DRC를 통과하지 못한 보드는 공장에서 거절당하거나 비싼 컵받침이 되어 돌아옵니다. 문제가 해결될 때까지 주문 버튼은 비활성 상태로 둡니다.</p>
+      <p>수정해 달라고 말씀하시거나, 구리 영역을 직접 조정한 뒤 <strong>DRC 다시 실행</strong>을 눌러 주세요.</p>`,
+    arts:['04_fab/gerber_output.zip','04_fab/order_payload.json'] },
+];
+
+/* the exact prompts from script.md, in order — F8 types the next one */
+const DEMO_PROMPTS = [
+  "I'm building a cocktail robot. It drives four peristaltic pumps at 12 volts, talks over Wi-Fi, and needs a USB-C port for firmware. I'm a software developer, not a hardware person — pick sensible parts for me.",
+  "Synthesize the schematic from @bom.json. Use a verified reference design for the buck converter rather than inventing the feedback network.",
+  "Place and route it. Keep the board under 100 by 60 millimetres, four layers, pumps along the right edge, USB-C bottom right, and give the 12 volt rails proper width.",
+  "Run DRC, export the Gerbers, and get me a quote for five boards.",
+  "Fix the clearance error on the 12 volt pour and re-run the check.",
+];
+
+/* =============================================================
+   State
+   ============================================================= */
+const S = {
+  projectId:'cocktail-robot',
+  sessionId:'s3',
+  stage:'LAYOUT',
+  model:'psayb-cv-route',
+  locked:true,
+  draft:false,      // true while composing a not-yet-created conversation
+  target:'로컬',
+  recording:false,
+  busy:false,
+  mode:'skilled',   // workspace panel: 'skilled' (technical) or 'easy' (plain language)
+  tab:'layout',     // remembered so switching mode re-renders the same stage
+};
+const SHORT = {PLAN:'PLAN', SCHEMATIC:'SCH', LAYOUT:'LAY', FAB:'FAB'};
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const proj = id => PROJECTS.find(p=>p.id===id);
+const sess = id => PROJECTS.flatMap(p=>p.sessions).find(s=>s.id===id);
+const modelName = id => (MODELS.find(m=>m.id===id)||{}).name || id;
+const stageOf = id => STAGES.find(s=>s.id===id);
+
+/* =============================================================
+   Sidebar tree
+   ============================================================= */
+function renderTree(){
+  $('#projTree').innerHTML = PROJECTS.map(p=>`
+    <div class="proj ${p.open?'open':''}" data-p="${p.id}">
+      <div class="proj-hd" data-toggle="${p.id}">
+        <span class="caret">▶</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.7"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        <span class="name">${p.name}</span>
+        <span class="conv-count" title="${p.sessions.length} conversation(s)">${p.sessions.length}</span>
+      </div>
+      <div class="proj-kids">
+        ${p.sessions.length ? p.sessions.map(s=>`
+          <div class="kid ${s.id===S.sessionId?'active':''}" data-s="${s.id}" title="${s.title} · ${s.stage}">
+            <span class="stage-pill s-${s.stage}">${SHORT[s.stage]}</span>
+            <span class="t">${s.title}</span><span class="age">${s.age}</span>
+          </div>`).join('')
+        : `<div class="kid" style="color:var(--muted);cursor:default">no conversations yet</div>`}
+      </div>
+    </div>`).join('');
+
+  $$('.proj-hd').forEach(el=>el.onclick=()=>{
+    const p = proj(el.dataset.toggle); p.open = !p.open; renderTree();
+  });
+  $$('.kid').forEach(el=>el.onclick=()=>openSession(el.dataset.s));
+}
+
+/* =============================================================
+   Pipeline rail
+   ============================================================= */
+function renderRail(){
+  const idx = STAGES.findIndex(s=>s.id===S.stage);
+  $('#rail').innerHTML = STAGES.map((s,i)=>{
+    const cls = i<idx?'done':(i===idx?'current':'');
+    /* link i joins step i to step i+1, so it carries the progress *into* stage
+       i+1: it glows while that stage is being produced and fills once it has
+       arrived. The link leaving the current stage stays empty — nothing has
+       started travelling it yet. */
+    const link = i<STAGES.length-1
+      ? `<div class="link ${i<idx-(S.busy?1:0)?'filled':''} ${i===idx-1&&S.busy?'active':''}"></div>` : '';
+    return `<div class="step ${cls}"><span class="num">${i<idx?checkIcon:i+1}</span><span class="lb">${s.label.toUpperCase()}</span></div>${link}`;
+  }).join('');
+}
+
+/* =============================================================
+   Thread rendering
+   ============================================================= */
+/* Inline line-icons. Nothing in this UI uses an emoji as an icon. */
+const IC = {
+  folder :'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h3.9a1.5 1.5 0 0 1 1.2.6l.9 1.2a1.5 1.5 0 0 0 1.2.6h7.8A1.5 1.5 0 0 1 21 9.9v7.6a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>',
+  monitor:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="4.5" width="19" height="13" rx="1.8"/><path d="M9 21h6" stroke-linecap="round"/></svg>',
+  cloud  :'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M17.5 19H7a4 4 0 0 1-.9-7.9A6 6 0 0 1 18 10.1a4.5 4.5 0 0 1-.5 8.9z"/></svg>',
+  model  :'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3.5l2.1 5.2 5.4.4-4.1 3.5 1.3 5.3L12 15l-4.7 2.9 1.3-5.3L4.5 9.1l5.4-.4z"/></svg>',
+  chev   :'<svg class="chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
+  file   :'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M14 3H7a1.8 1.8 0 0 0-1.8 1.8v14.4A1.8 1.8 0 0 0 7 21h10a1.8 1.8 0 0 0 1.8-1.8V7.8z"/><path d="M14 3v4.8h4.8"/></svg>',
+  copy   :'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="1.8"/><path d="M5 15h-.2A1.8 1.8 0 0 1 3 13.2V4.8A1.8 1.8 0 0 1 4.8 3h8.4A1.8 1.8 0 0 1 15 4.8V5"/></svg>',
+  retry  :'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 20v-5h5"/></svg>',
+  like   :'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M7 21V10l5-7 .9.6a2 2 0 0 1 .8 2L13 9h5.3a2 2 0 0 1 2 2.5l-1.8 7A2 2 0 0 1 16.5 20H7z"/></svg>',
+  dislike:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M17 3v11l-5 7-.9-.6a2 2 0 0 1-.8-2L11 15H5.7a2 2 0 0 1-2-2.5l1.8-7A2 2 0 0 1 7.5 4H17z"/></svg>',
+};
+
+/* agent steps read as prose when collapsed, like the reference UI */
+const STEP_LABEL = {
+  load_artifacts:'단계 아티팩트 불러옴', cv_place:'부품 배치함',
+  autoroute:'보드 배선함',           extract_requirements:'요구사항 추출함',
+  resolve_bom:'BOM 확인함',         rag_retrieve:'참조 설계 검색함',
+  synthesize_netlist:'넷리스트 합성함', erc_check:'ERC 실행함',
+  run_drc:'DRC 실행함', export_gerber:'거버 내보냄', jlc_quote:'제조사 견적 조회함',
+  adjust_pour:'구리 영역 조정함',
+};
+const stepLabel = n => STEP_LABEL[n] || n;
+const checkIcon = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>`;
+const clock = () => new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+
+const stepRow = s =>
+  `<div class="step-row"><button class="step-line">${IC.chev}${stepLabel(s.n)}</button>` +
+  `<div class="step-out">${s.out}</div></div>`;
+
+const artRow = arts => !arts || !arts.length ? '' :
+  `<div class="artifacts">${arts.map(a=>`<span class="artifact-link" data-art="${a}">${IC.file}${a}</span>`).join('')}</div>`;
+
+const turnFoot = ts =>
+  `<div class="turn-foot"><span>${ts||''}</span><span class="acts">` +
+  `<button title="복사">${IC.copy}</button><button title="좋은 답변">${IC.like}</button>` +
+  `<button title="별로인 답변">${IC.dislike}</button></span></div>`;
+
+function msgUser(m){
+  return `<div class="msg user"><div class="bubble">${m.t}<span class="meta">${m.ts||''}` +
+    `<button title="복사">${IC.copy}</button><button title="다시 시도">${IC.retry}</button></span></div></div>`;
+}
+function msgAI(m){
+  return `<div class="msg"><div class="bubble">` +
+    `${(m.steps||[]).map(stepRow).join('')}${m.t}${artRow(m.arts)}${turnFoot(m.ts)}</div></div>`;
+}
+function renderThread(){
+  const msgs = S.sessionId ? (THREADS[S.sessionId] || []) : [];
+  msgs.forEach(m=>{ if(!m.ts) m.ts = clock(); });
+  $('#thread').innerHTML = msgs.length
+    ? msgs.map(m=>m.r==='user'?msgUser(m):msgAI(m)).join('')
+    : !S.sessionId
+      ? `<div class="empty">
+          <div class="t">열려 있는 대화 없음</div>
+          <div class="s">이 워크스페이스에는 아직 대화가 없습니다. 대화 하나는 파이프라인 단계 하나를 담당합니다 — <strong>기획</strong>부터 시작하세요.</div></div>`
+      : `<div class="empty">
+          <div class="t">새 ${stageOf(S.stage).label} 대화</div>
+          <div class="s">${stageOf(S.stage).sub}. 원하는 내용을 평범한 말로 설명해 주세요 — 보내는 순간 단계와 모델이 고정됩니다.</div></div>`;
+  bindTurns();
+  $('#thread').scrollTop = 1e6;
+}
+function bindTurns(){
+  $$('.step-line').forEach(el=>el.onclick=()=>el.parentElement.classList.toggle('open'));
+  $$('.artifact-link').forEach(el=>el.onclick=()=>{
+    const p = el.dataset.art;
+    const map = {'01':'plan','02':'schematic','03':'layout','04':'fab'};
+    switchTab(map[p.slice(0,2)]||'plan', true);
+    toast(`${p} 열림`);
+  });
+}
+
+/* =============================================================
+   Session switching
+   ============================================================= */
+function openSession(id){
+  const s = sess(id); if(!s) return;
+  const p = PROJECTS.find(x=>x.sessions.includes(s));
+  S.sessionId=id; S.projectId=p.id; S.stage=s.stage; S.model=s.model; S.locked=s.locked;
+  S.draft=false;
+  syncAll();
+  switchTab(s.stage.toLowerCase());
+}
+
+function syncAll(){
+  const p = proj(S.projectId), st = stageOf(S.stage);
+  document.querySelector('.chatpane').classList.toggle('draft', !!S.draft);
+  $('#draftProjName').textContent = p.name;
+  $('#tbProject').textContent = p.name;
+  $('#tbStage').textContent   = st.label;
+  $('#pkName').textContent    = p.name;
+  $('#pkTitle').textContent   = S.draft ? '새 대화'
+                              : (sess(S.sessionId)||{}).title || '제목 없음';
+  $('#sbPath').textContent    = p.path;
+  $('#sbStage').textContent   = S.stage;
+  $('#modelLabel').textContent= modelName(S.model);
+  $('#modelTier').textContent = (MODELS.find(m=>m.id===S.model)||{}).tier || '';
+  $('#stageLabel').textContent= st.label;
+  $('#stageDot').style.background = st.color;
+  $('#stageDot').style.color      = st.color;
+
+  // lock UI
+  $('#lockBadge').style.display = S.locked?'flex':'none';
+  $('#lockText').textContent = `${S.stage} · ${modelName(S.model)}`;
+  $('#btnModel').classList.toggle('locked', S.locked);
+  $('#btnStage').classList.toggle('locked', S.locked);
+  $('#btnModel').title = S.locked ? '이 대화에서는 잠겨 있습니다 — 변경하려면 새 대화를 시작하세요' : 'AI 모델 선택';
+  $('#btnStage').title = $('#btnModel').title;
+
+  renderTree(); renderRail(); renderThread();
+}
+
+/* =============================================================
+   Canvas tabs
+   ============================================================= */
+/* reveal:true forces a collapsed workspace panel back open — used when the user
+   clicks an artifact, but not when merely following a conversation's stage */
+/* every stage has two views — #view-layout and #view-layout-easy — and the mode
+   segment picks which of the pair is rendered */
+function switchTab(v, reveal){
+  if(reveal) setPane('canvas', true);
+  S.tab = v;
+  const id = S.mode==='easy' ? `view-${v}-easy` : `view-${v}`;
+  $$('.tab').forEach(t=>t.classList.toggle('active', t.dataset.view===v));
+  $$('.view').forEach(x=>x.classList.toggle('show', x.id===id));
+}
+$$('.tab').forEach(t=>t.onclick=()=>t.dataset.view&&switchTab(t.dataset.view));
+
+$$('#modeSeg .seg').forEach(b=>b.onclick=()=>{
+  S.mode = b.dataset.mode;
+  $$('#modeSeg .seg').forEach(x=>x.classList.toggle('on', x===b));
+  switchTab(S.tab);
+});
+
+/* =============================================================
+   Collapsible panes
+   ============================================================= */
+const bodyEl = document.querySelector('.body');
+const PANE = {sidebar:true, canvas:true, expanded:false};
+
+function setPane(which, open){
+  PANE[which] = open;
+  bodyEl.classList.toggle(which==='sidebar'?'sb-collapsed':'cv-collapsed', !open);
+  if(which==='canvas' && !open) setExpanded(false);   // closing also un-expands
+  $('#tgSidebar').classList.toggle('off', !PANE.sidebar);
+  closeMenus();                        // anchored menus would float loose otherwise
+}
+const togglePane = which => setPane(which, !PANE[which]);
+
+/* ⤢ — grow the workspace panel to the full window, hiding the other two panes */
+function setExpanded(on){
+  PANE.expanded = on;
+  bodyEl.classList.toggle('cv-expanded', on);
+  $('#btnExpandCv').title = on ? '패널 원래대로' : '패널 확장';
+}
+
+$('#tgSidebar').onclick     = ()=>togglePane('sidebar');
+$('#btnCollapseCv').onclick = ()=>setPane('canvas', false);
+$('#btnExpandCv').onclick   = ()=>setExpanded(!PANE.expanded);
+$('#railExpand').onclick    = ()=>setPane('sidebar', true);
+
+/* rail buttons expand first, then do their thing */
+$('#railNew').onclick      = ()=>{ setPane('sidebar', true); $('#btnNewConv').click(); };
+$('#railSearch').onclick   = ()=>{ setPane('sidebar', true); $('#sbSearch').focus(); };
+$('#railHistory').onclick  = ()=>{ setPane('sidebar', true); $('#rowHistory').click(); };
+$('#railTasks').onclick    = ()=>{ setPane('sidebar', true); $('#rowTasks').click(); };
+$('#railProjects').onclick = ()=>setPane('sidebar', true);
+
+document.addEventListener('keydown', e=>{
+  if(!(e.ctrlKey||e.metaKey)) return;
+  if(e.key.toLowerCase()!=='b') return;
+  e.preventDefault();
+  togglePane(e.shiftKey ? 'canvas' : 'sidebar');
+});
+
+/* BOM table */
+$('#bomBody').innerHTML = BOM.map(([ref,part,pkg,qty,unit,st,stock])=>`
+  <tr><td class="ref">${ref}</td><td>${part}</td><td>${pkg}</td>
+  <td class="num">${qty}</td><td class="num">$${unit}</td>
+  <td><span class="stock ${st}">${stock}</span></td></tr>`).join('');
+
+/* layer toggles */
+$$('#layerChips .chip').forEach(c=>c.onclick=()=>{
+  c.classList.toggle('on');
+  const map={top:'lay-top',bottom:'lay-bottom',silk:'lay-silk',pads:'lay-pads',ratsnest:'lay-rats',mask:'lay-mask'};
+  const el = document.getElementById(map[c.dataset.layer]);
+  if(el) el.style.display = c.classList.contains('on')?'':'none';
+});
+
+/* Spec sliders exist in both modes. They're the same three numbers, so a change
+   in one view writes through to the other — the two must never disagree. */
+const SPEC = [
+  {sk:'oV', ez:'eoV', su:' V',  eu:'볼트'},
+  {sk:'oI', ez:'eoI', su:' A',  eu:'암페어'},
+  {sk:'oA', ez:'eoA', su:' mm', eu:'mm'},
+];
+function setSpec(pair, val){
+  $$(`[data-out="${pair.sk}"],[data-eout="${pair.ez}"]`).forEach(r=>r.value = val);
+  document.getElementById(pair.sk).textContent = val + pair.su;
+  document.getElementById(pair.ez).textContent = val + pair.eu;
+}
+SPEC.forEach(p=>{
+  $$(`[data-out="${p.sk}"],[data-eout="${p.ez}"]`).forEach(r=>{
+    r.oninput = ()=>setSpec(p, r.value);
+  });
+});
+
+/* easy layout view: one toggle instead of six layer chips */
+$('#eWireChip').onclick = ()=>{
+  const c = $('#eWireChip');
+  c.classList.toggle('on');
+  $('#elay-wires').style.display = c.classList.contains('on') ? '' : 'none';
+};
+$('#btnResolveBom').onclick = ()=>toast('실시간 벤더 재고를 기준으로 BOM 14개 항목을 다시 확인했습니다 (0.31초)');
+
+/* =============================================================
+   Fab state
+   The board's pre-flight result is rendered twice — as the technical DRC
+   report and as the plain-language safety check. Both are written from
+   setFabState() so a scripted fix, a manual re-check and the demo reset
+   can never leave the two views disagreeing about whether the board is
+   safe to order.
+   ============================================================= */
+const okDot   = `<span class="e-dot"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>`;
+const infoDot = `<span class="e-dot"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 11v6M12 7.4v.01"/></svg></span>`;
+
+/* the error state is the markup already in the document — captured at boot so
+   it lives in exactly one place, the HTML */
+const FAB_ERROR = {};
+const FAB_CLEAN = {
+  drcList:`
+      <div class="issue info"><div class="ic"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></div><div class="txt">간격 위반 해결됨 — 구리 영역을 0.24 mm까지 뒤로 물림<div class="loc">layout: 46.8, 22.1 · net +12V</div></div></div>
+      <div class="issue warn"><div class="ic"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5 21 20H3z"/><path d="M12 10.5v3.4M12 16.8v.01"/></svg></div><div class="txt">U2 노출 패드에 서멀 릴리프 누락<div class="loc">layout: 12.4, 41.0 · ref U2</div></div></div>
+      <div class="issue warn"><div class="ic"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5 21 20H3z"/><path d="M12 10.5v3.4M12 16.8v.01"/></svg></div><div class="txt">J1.2 패드 위에 실크스크린 겹침<div class="loc">layout: 9.2, 52.6 · ref J1</div></div></div>`,
+  drcMeta:'오류 0건 · 경고 2건 · 1,842건 검사',
+  easyList:`
+      <div class="e-check good">${okDot}
+        <div><div class="t">전원선 두 개를 서로 떨어뜨렸습니다</div>
+        <div class="d">간격이 이전의 약 두 배가 되어, 공장이 안정적으로 인쇄하는 데 필요한 것보다 넉넉해졌습니다. 이를 위해 배선을 다시 연결하지는 않았습니다. 근처 구리의 모양만 바뀌었을 뿐, 보드의 나머지는 보셨던 그대로입니다.</div></div>
+      </div>
+      <div class="e-check mute">${infoDot}
+        <div><div class="t">사소한 참고사항 두 가지</div>
+        <div class="d">인쇄된 라벨이 금속 접점 하나를 살짝 침범했고, 부품 하나는 방열 연결을 더 깔끔하게 할 수 있습니다. 둘 다 보드 작동에는 영향이 없고, 공장에서 매일 보는 흔한 경우입니다.</div></div>
+      </div>`,
+  easyNote:'그림에 동그라미 쳐져 있던 지점을 처리했습니다 — 이 보드에서 더 이상 신경 쓸 부분은 없습니다.',
+};
+
+function setFabState(clean){
+  const f = clean ? FAB_CLEAN : FAB_ERROR;
+  $('#drcList').innerHTML   = f.drcList;
+  $('#drcMeta').textContent = f.drcMeta;
+  $('#eDrcList').innerHTML  = f.easyList;
+  $('#eLayNote').innerHTML  = f.easyNote;
+
+  ['#drcSpot','#eDrcSpot'].forEach(sel=>{
+    const s = $(sel); if(s) s.style.display = clean ? 'none' : '';
+  });
+
+  const o = $('#btnOrder');
+  o.disabled  = !clean;
+  o.textContent = clean ? '보드 5장 주문 · $28.40' : 'DRC 오류 1건을 해결하면 주문 가능';
+  const e = $('#eOrderBtn');
+  e.disabled  = !clean;
+  e.textContent = clean ? '보드 5장 주문 — $28.40' : '먼저 문제 하나를 해결하세요';
+
+  $$('.tab').forEach(t=>{
+    if(t.dataset.view!=='fab') return;
+    t.classList.toggle('ready', clean);
+    t.classList.toggle('pending', !clean);
+  });
+}
+
+function applyDrcFix(){
+  setFabState(true);
+  toast(S.mode==='easy'
+    ? '보드 확인 완료 — 더 고칠 것이 없어 지금 주문할 수 있습니다'
+    : 'DRC 통과 — 규칙 커버리지 98.4% · 주문 잠금 해제됨');
+}
+
+/* both re-check buttons run the same check, and it takes a moment either way */
+function runCheck(btn, busyLabel){
+  const label = btn.textContent;
+  btn.textContent = busyLabel; btn.disabled = true;
+  setTimeout(()=>{ applyDrcFix(); btn.textContent = label; btn.disabled = false; }, 1400);
+}
+$('#btnRerunDrc').onclick = ()=>runCheck($('#btnRerunDrc'), '실행 중…');
+$('#eBtnRecheck').onclick = ()=>runCheck($('#eBtnRecheck'), '확인 중…');
+
+function submitOrder(){
+  const o=$('#btnOrder'), e=$('#eOrderBtn');
+  o.disabled = e.disabled = true;
+  o.textContent = 'JLCPCB에 업로드 중…';
+  e.textContent = '주문 전송 중…';
+  setTimeout(()=>{
+    o.textContent = 'JLC-2408-77312 주문 완료';
+    e.textContent = '주문 완료 — 약 3일 후 도착';
+    toast(S.mode==='easy'
+      ? '주문을 보냈습니다 — 예약된 작업에서 확인할 수 있습니다'
+      : '주문 완료 · 예약된 작업에서 추적 가능');
+  },1500);
+}
+$('#btnOrder').onclick  = submitOrder;
+$('#eOrderBtn').onclick = submitOrder;
+
+/* =============================================================
+   Menus
+   ============================================================= */
+function placeMenu(menu, anchor, align='left'){
+  const r = anchor.getBoundingClientRect();
+  menu.classList.add('show');
+  const mw = menu.offsetWidth;
+  let x = align==='right' ? r.right-mw : r.left;
+  x = Math.max(8, Math.min(x, innerWidth-mw-8));
+  menu.style.left = x+'px';
+  let top = r.top - menu.offsetHeight - 6;      // prefer above the anchor
+  if(top < 8) top = r.bottom + 6;               // flip below when there's no room
+  menu.style.top = top+'px';
+}
+function closeMenus(){ $$('.menu').forEach(m=>m.classList.remove('show')); }
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.menu') && !e.target.closest('[data-keepmenu]')) closeMenus();
+  if(!e.target.closest('.composer')) hidePops();
+});
+
+$('#menuModel').innerHTML = MODELS.map(m=>`<div class="mi" data-m="${m.id}">${IC.model}<div>${m.name} <span style="color:var(--muted)">${m.tier}</span><span class="sub">${m.sub}</span></div></div>`).join('');
+$('#menuStage').innerHTML = STAGES.map(s=>`<div class="mi" data-s="${s.id}"><span class="dot" style="background:${s.color};color:${s.color}"></span><div>${s.label}<span class="sub">${s.sub}</span></div></div>`).join('');
+
+$('#btnModel').setAttribute('data-keepmenu','');
+$('#btnStage').setAttribute('data-keepmenu','');
+$('#btnTarget').setAttribute('data-keepmenu','');
+$('#btnFolderAdd').setAttribute('data-keepmenu','');
+$('#projPicker').setAttribute('data-keepmenu','');
+
+$('#btnModel').onclick = ()=>{
+  if(S.locked) return toast('이 대화에서는 모델이 잠겨 있습니다 — 변경하려면 새 대화를 시작하세요');
+  closeMenus(); placeMenu($('#menuModel'), $('#btnModel'));
+};
+$('#btnStage').onclick = ()=>{
+  if(S.locked) return toast('이 대화에서는 파이프라인 단계가 잠겨 있습니다 — 변경하려면 새 대화를 시작하세요');
+  closeMenus(); placeMenu($('#menuStage'), $('#btnStage'));
+};
+$('#btnTarget').onclick = ()=>{ closeMenus(); placeMenu($('#menuTarget'), $('#btnTarget'), 'right'); };
+$('#btnFolderAdd').onclick = ()=>{ closeMenus(); placeMenu($('#menuFolder'), $('#btnFolderAdd')); };
+function openProjectMenu(anchor){
+  $('#menuProject').innerHTML = PROJECTS.map(p=>`<div class="mi ${p.id===S.projectId?'on':''}" data-p="${p.id}">${IC.folder}<div>${p.name}<span class="sub">${p.path}</span></div></div>`).join('');
+  closeMenus(); placeMenu($('#menuProject'), anchor);
+  $$('#menuProject .mi').forEach(el=>el.onclick=()=>{
+    const p = proj(el.dataset.p); closeMenus(); p.open = true;
+    /* while drafting, just retarget the draft; otherwise open that project's
+       most recent conversation, since stage lives on the conversation */
+    if(S.draft || !p.sessions.length) return enterDraft(p.id);
+    openSession(p.sessions[0].id);
+  });
+}
+$('#projPicker').onclick = ()=>openProjectMenu($('#projPicker'));
+
+$$('#menuModel .mi').forEach(el=>el.onclick=()=>{ S.model=el.dataset.m; closeMenus(); syncAll(); });
+$$('#menuStage .mi').forEach(el=>el.onclick=()=>{ S.stage=el.dataset.s; closeMenus(); syncAll(); switchTab(S.stage.toLowerCase()); });
+$$('#menuTarget .mi').forEach(el=>el.onclick=()=>{ S.target=el.dataset.t; $('#targetLabel').textContent=S.target; closeMenus(); });
+
+$('#miQuickStart').onclick = ()=>{
+  closeMenus();
+  const ts = new Date().toISOString().replace(/[-:T]/g,'').slice(0,15).replace(/(\d{8})(\d{6})/,'$1-$2');
+  const name = `project-${ts}`;
+  PROJECTS.unshift({id:name, name, path:`C:\\Users\\iannl\\psayb-projects\\${name}`, open:true, sessions:[]});
+  toast(`~/psayb-projects/${name}/ 생성됨 (.psayb/, 01_plan … 04_fab 포함)`);
+  renderTree();
+  enterDraft(name);          // drop straight into a Plan draft, nothing blocking
+};
+$('#miNewProject').onclick = ()=>{ closeMenus(); toast('디렉터리 선택 창 여는 중… (모의)'); };
+$('#rowTasks').onclick = ()=>toast('백그라운드 작업 2건: cocktail-robot 자동배선 · 부품 52,418개 가격 조회');
+$('#rowHistory').onclick = ()=>toast('프로젝트 3개에 걸쳐 대화 6개');
+$('#btnAttach').onclick = ()=>toast('데이터시트, 핀아웃 이미지, 참조 거버 첨부 (모의)');
+
+/* =============================================================
+   Composer: @ / popups, mic, send
+   ============================================================= */
+const input = $('#input');
+function hidePops(){ $('#popSlash').classList.remove('show'); $('#popMention').classList.remove('show'); }
+
+function renderPop(el, listEl, items, token){
+  const f = items.filter(i=>i.k.toLowerCase().includes(token.toLowerCase()));
+  if(!f.length){ el.classList.remove('show'); return; }
+  listEl.innerHTML = f.map((i,n)=>`<div class="pop-item ${n===0?'sel':''}" data-k="${i.k}"><span class="k">${i.k}</span><span class="d">${i.d}</span></div>`).join('');
+  el.classList.add('show');
+  [...listEl.children].forEach(c=>c.onclick=()=>{
+    const v = input.value.replace(/[@/][\w.\-]*$/, c.dataset.k+' ');
+    input.value = v; hidePops(); input.focus(); autosize();
+  });
+}
+
+function autosize(){
+  input.style.height='auto';
+  input.style.height=Math.min(input.scrollHeight,150)+'px';
+  $('#btnSend').disabled = !input.value.trim() || S.busy;
+}
+
+input.addEventListener('input', ()=>{
+  autosize();
+  const m = input.value.match(/(^|\s)([@/][\w.\-]*)$/);
+  hidePops();
+  if(!m) return;
+  const tok = m[2];
+  if(tok[0]==='/') renderPop($('#popSlash'), $('#popSlashList'), SLASH, tok);
+  else             renderPop($('#popMention'), $('#popMentionList'), MENTIONS, tok);
+});
+
+input.addEventListener('keydown', e=>{
+  if(e.key==='Escape') hidePops();
+  if(e.key==='Enter' && !e.shiftKey){
+    e.preventDefault();
+    const sel = document.querySelector('.pop.show .pop-item.sel');
+    if(sel){ sel.click(); return; }
+    send();
+  }
+});
+
+$('#btnMic').onclick = ()=>{
+  S.recording = !S.recording;
+  const b=$('#btnMic');
+  b.classList.toggle('rec', S.recording);
+  if(S.recording){
+    $('#micInner').innerHTML = `<span class="wave"><i></i><i></i><i></i><i></i><i></i></span>`;
+    toast('듣는 중… 원하는 하드웨어를 말씀해 주세요');
+    setTimeout(()=>{
+      if(!S.recording) return;
+      input.value += (input.value?' ':'') + '펌프 채널을 다섯 번째로 하나 추가하고, 입력 레일을 24볼트로 올려줘.';
+      autosize(); $('#btnMic').click();
+    }, 2600);
+  } else {
+    $('#micInner').innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>`;
+  }
+};
+
+$('#btnSend').onclick = send;
+
+function send(){
+  const text = input.value.trim();
+  if(!text || S.busy) return;
+  hidePops();
+  input.value=''; autosize();
+
+  const title = text.slice(0,34)+(text.length>34?'…':'');
+
+  if(S.draft || !S.sessionId){
+    // the draft materializes into a real thread, locked to its stage + model
+    const id = 'n'+Date.now();
+    proj(S.projectId).open = true;
+    proj(S.projectId).sessions.unshift({id, title, age:'방금', stage:S.stage, model:S.model, locked:true});
+    THREADS[id] = [];
+    S.sessionId=id; S.draft=false; S.locked=true;
+    syncAll();
+    toast(`이 대화는 ${S.stage} · ${modelName(S.model)}로 고정되었습니다`);
+  } else if(!S.locked){
+    // strict lock on first dispatch of an existing unlocked thread
+    S.locked = true;
+    const s = sess(S.sessionId); if(s){ s.locked=true; s.stage=S.stage; s.model=S.model; s.title=title; s.age='방금'; }
+    syncAll();
+    toast(`이 대화는 ${S.stage} · ${modelName(S.model)}로 고정되었습니다`);
+  }
+
+  const thread = THREADS[S.sessionId] = THREADS[S.sessionId] || [];
+  thread.push({r:'user', t:text.replace(/</g,'&lt;')});
+  renderThread();
+
+  // streamed assistant response
+  S.busy = true; $('#btnSend').disabled = true; renderRail();
+  const plan = pickReply(text);
+  const el = document.createElement('div');
+  el.className='msg';
+  el.innerHTML = `<div class="bubble" id="live"></div>`;
+  $('#thread').appendChild(el);
+  const live = el.querySelector('#live');
+  const th = $('#thread');
+
+  let i=0;
+  const runStep = ()=>{
+    if(i>=plan.steps.length){ finish(); return; }
+    const s = plan.steps[i];
+    const row = document.createElement('div');
+    row.className='step-row';
+    row.innerHTML = `<span class="step-line"><span class="spin"></span>${stepLabel(s.n)}…</span>`;
+    live.appendChild(row); th.scrollTop=1e6;
+    setTimeout(()=>{
+      row.innerHTML = `<button class="step-line">${IC.chev}${stepLabel(s.n)}</button>
+        <div class="step-out">${s.out}</div>`;
+      th.scrollTop=1e6; i++; runStep();
+    }, 700+Math.random()*500);
+  };
+  const finish = ()=>{
+    const ts = clock();
+    const body = document.createElement('div');
+    body.innerHTML = plan.t + artRow(plan.arts) + turnFoot(ts);
+    live.appendChild(body);
+    live.removeAttribute('id');
+    thread.push({r:'ai', ts, steps:plan.steps, t:plan.t, arts:plan.arts});
+    S.busy=false; renderRail(); autosize(); bindTurns(); th.scrollTop=1e6;
+    switchTab(plan.tab);
+    if(plan.fx==='fixDrc') setTimeout(applyDrcFix, 260);
+  };
+  setTimeout(runStep, 420);
+}
+
+/* =============================================================
+   New conversation — inline draft, no modal.
+   The composer centers itself, the project picker moves above it, and stage +
+   model stay editable in the composer until the first message materializes
+   the thread.
+   ============================================================= */
+
+/* A project has no stage, so the suggested stage comes from its most recent
+   conversation (artifacts are inherited forward); empty projects start at PLAN. */
+function suggestStage(pid){
+  const ss = proj(pid).sessions;
+  return ss.length ? ss[0].stage : 'PLAN';
+}
+
+function enterDraft(pid){
+  S.projectId = pid || S.projectId;
+  S.sessionId = null;
+  S.draft     = true;
+  S.locked    = false;                 // stage + model editable until first send
+  S.stage     = suggestStage(S.projectId);
+  input.value = ''; autosize();
+  syncAll();
+  switchTab(S.stage.toLowerCase());
+  input.focus();
+}
+
+$('#btnNewConv').onclick = ()=>enterDraft(S.projectId);
+$('#draftProj').setAttribute('data-keepmenu','');
+$('#draftProj').onclick = ()=>openProjectMenu($('#draftProj'));
+
+/* Esc closes whatever is open first, and only then abandons an empty draft */
+document.addEventListener('keydown', e=>{
+  if(e.key!=='Escape' || !S.draft || input.value.trim()) return;
+  if(document.querySelector('.menu.show, .pop.show')){ closeMenus(); hidePops(); return; }
+  const last = PROJECTS.flatMap(p=>p.sessions)[0];
+  if(last) openSession(last.id);
+});
+
+/* =============================================================
+   Toast
+   ============================================================= */
+let tT;
+function toast(msg){
+  const t=$('#toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(tT); tT=setTimeout(()=>t.classList.remove('show'),2600);
+}
+
+/* =============================================================
+   DEMO CONTROLS  (see script.md)
+     F8  type the next scripted prompt into the composer — you press Enter
+     F9  reset to the demo start state for another take
+   ============================================================= */
+function pickReply(text){
+  const hit = SCRIPT.find(s=>s.stage===S.stage && s.match.test(text));
+  return hit || REPLIES[S.stage];
+}
+
+let demoIdx = 0, typing = false;
+
+function typePrompt(text){
+  if(typing || S.busy) return;
+  typing = true;
+  input.focus();
+  input.value = '';
+  let i = 0;
+  const tick = ()=>{
+    if(i >= text.length){ typing = false; hidePops(); return; }
+    input.value += text[i++];
+    input.dispatchEvent(new Event('input'));
+    setTimeout(tick, 16 + Math.random()*30);
+  };
+  tick();
+}
+
+function resetDemo(){
+  const p = proj('cocktail-robot');
+  p.sessions.length = 0;                       // demo builds these live, on camera
+  p.open = true;
+  // drop the demo project's seeded threads and anything created in a previous take;
+  // the other projects keep their history so the sidebar still looks lived-in
+  const KEEP = ['s4','s5','s6'];
+  Object.keys(THREADS).forEach(k=>{ if(!KEEP.includes(k)) delete THREADS[k]; });
+
+  setFabState(false);          // both Fab views back to 1 error, ordering locked
+
+  demoIdx = 0;
+  setPane('sidebar', true); setPane('canvas', true); setExpanded(false);
+  S.model = 'gemini-3.1-pro'; S.target = '로컬'; $('#targetLabel').textContent = '로컬';
+  enterDraft('cocktail-robot');
+  toast('데모 초기화 완료 — 녹화 준비됨');
+}
+
+document.addEventListener('keydown', e=>{
+  if(e.key === 'F8'){
+    e.preventDefault();
+    if(demoIdx < DEMO_PROMPTS.length) typePrompt(DEMO_PROMPTS[demoIdx++]);
+    else toast('스크립트 끝');
+  }
+  if(e.key === 'F9'){ e.preventDefault(); resetDemo(); }
+});
+
+/* boot */
+FAB_ERROR.drcList  = $('#drcList').innerHTML;
+FAB_ERROR.drcMeta  = $('#drcMeta').textContent;
+FAB_ERROR.easyList = $('#eDrcList').innerHTML;
+FAB_ERROR.easyNote = $('#eLayNote').innerHTML;
+syncAll();
+switchTab('layout');
+if(location.hash === '#demo') resetDemo();
+</script>
+</body>
+</html>
