@@ -56,18 +56,22 @@ function LiveDemoDesktop({ language }: { language: Language }) {
     bridge.openingLayout();
 
     bridgeRef.current = bridge;
-    driverRef.current = createDriver(bridge, {
-      onPhase: (next, index) => {
-        setPhase(next);
-        setActive(index);
+    driverRef.current = createDriver(
+      bridge,
+      {
+        onPhase: (next, index) => {
+          setPhase(next);
+          setActive(index);
+        },
+        onChapterDone: (index) =>
+          setDone((current) => (current.includes(index) ? current : [...current, index])),
+        onLoop: () => setDone([]),
       },
-      onChapterDone: (index) =>
-        setDone((current) => (current.includes(index) ? current : [...current, index])),
-      onLoop: () => setDone([]),
-    });
+      language,
+    );
 
     setReady(true);
-  }, []);
+  }, [language]);
 
   const playFrom = useCallback((index: number) => {
     const driver = driverRef.current;

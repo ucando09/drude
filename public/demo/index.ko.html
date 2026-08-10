@@ -1565,7 +1565,7 @@ const REPLIES = {
    an off-script prompt on camera still answers sensibly.
    ============================================================= */
 const SCRIPT = [
-  { stage:'PLAN', match:/cocktail|pump|drink|bartend|robot/i, tab:'plan',
+  { stage:'PLAN', match:/칵테일|펌프|로봇|음료|바텐더/, tab:'plan',
     steps:[
       {n:'extract_requirements', out:'input: natural language, 3 sentences\nresolved: 6 electrical constraints, 2 mechanical\nrails: 12 V in -> 5 V -> 3.3 V\nloads: 4 x inductive, 400 mA nominal\nblocking ambiguities: 0'},
       {n:'resolve_bom', out:'vendor query across 52,418 indexed parts (0.31 s)\n14 lines resolved - 0 unresolved\nsecond source pinned on 2 lines\nunit cost $18.62 @ 5 pcs'},
@@ -1579,7 +1579,7 @@ const SCRIPT = [
       <p>지금 기준 14개 항목 모두 재고가 있고, 단가는 <strong>보드 5장 기준 $18.62</strong>입니다. BOM은 기획 탭에 있습니다 — 부품을 확인하시고, 괜찮으시면 회로도 대화를 시작해 주세요.</p>`,
     arts:['01_plan/requirements.json','01_plan/bom.json'] },
 
-  { stage:'SCHEMATIC', match:/schematic|netlist|bom\.json|reference design/i, tab:'schematic',
+  { stage:'SCHEMATIC', match:/회로도|넷리스트|bom\.json|참조 설계/i, tab:'schematic',
     steps:[
       {n:'rag_retrieve', out:'vector search over 41,208 open-source designs\nMP1584 evaluation board rev C - cosine 0.94\nESP32 DevKit-C power section - cosine 0.91\nDRV8871 EVM - cosine 0.89'},
       {n:'synthesize_netlist', out:'96 nets - 214 pins - 0 floating\nBOM -> pin mapping accuracy 99.1%\ndifferential pair USB_DP/USB_DM matched to 0.1 mm'},
@@ -1590,7 +1590,7 @@ const SCRIPT = [
       <p>BOM 대비 핀 매핑 정확도는 <strong>99.1%</strong>입니다. 다이어그램과 넷 인스펙터는 회로도 탭에 있습니다.</p>`,
     arts:['02_schematic/schematic.svg','02_schematic/netlist.json'] },
 
-  { stage:'LAYOUT', match:/place|route|layout|board|mm|edge/i, tab:'layout',
+  { stage:'LAYOUT', match:/배치|배선|레이아웃|보드|밀리미터|가장자리/i, tab:'layout',
     steps:[
       {n:'load_artifacts', out:'02_schematic/netlist.json -> 96 nets, 214 pins\n01_plan/bom.json -> 14 lines, all footprints resolved'},
       {n:'cv_place', out:'placement pass 1 -> score 0.87\nplacement pass 2 -> score 0.93\nthermal cluster: U4..U7 grouped on right edge (delta-t 11 C)\nboard 100.0 x 60.0 mm - within your budget'},
@@ -1605,7 +1605,7 @@ const SCRIPT = [
       <p>일반 자동배선기 대비 면적 효율은 <strong>+17.4%</strong>입니다. 한 가지 알려드릴 점은, 사전 DRC에서 비아 V63 근처에 <strong>간격 문제</strong>가 발견되어 보드에 빨간색으로 표시되어 있다는 겁니다. 주문 전에 처리하시는 걸 권합니다.</p>`,
     arts:['03_layout/board_layout.json','03_layout/drc_report.json'] },
 
-  { stage:'FAB', match:/fix|clearance|pour|re-?run/i, tab:'fab', fx:'fixDrc',
+  { stage:'FAB', match:/고치|간격|구리 영역|다시\s*실행/i, tab:'fab', fx:'fixDrc',
     steps:[
       {n:'adjust_pour', out:'+12V pour pulled back near V63\nclearance 0.14 mm -> 0.24 mm (min 0.20 mm)\nno nets rerouted - copper only'},
       {n:'run_drc', out:'IPC-2221 Class 2 - 1,842 checks\n0 errors, 2 warnings'},
@@ -1615,7 +1615,7 @@ const SCRIPT = [
       <p>주문 잠금이 해제되었습니다. 제작 탭에서 바로 주문 버튼을 누르실 수 있습니다.</p>`,
     arts:['04_fab/drc_report.json'] },
 
-  { stage:'FAB', match:/drc|gerber|quote|order|five|5 board/i, tab:'fab',
+  { stage:'FAB', match:/거버|견적|DRC|5장/i, tab:'fab',
     steps:[
       {n:'run_drc', out:'IPC-2221 Class 2 - 1,842 checks\n1 error, 2 warnings\nerror: clearance 0.14 mm between +12V and PUMP4_OUT2 at via V63'},
       {n:'export_gerber', out:'RS-274X + NC drill - 11 files - 412 KB\ngerber_output.zip written to 04_fab/'},
@@ -1627,13 +1627,14 @@ const SCRIPT = [
     arts:['04_fab/gerber_output.zip','04_fab/order_payload.json'] },
 ];
 
-/* the exact prompts from script.md, in order — F8 types the next one */
+/* Korean counterpart of index.html's DEMO_PROMPTS — kept word-for-word in sync
+   with CHAPTERS[].promptKo in src/lib/demoBridge.ts. F8 types the next one. */
 const DEMO_PROMPTS = [
-  "I'm building a cocktail robot. It drives four peristaltic pumps at 12 volts, talks over Wi-Fi, and needs a USB-C port for firmware. I'm a software developer, not a hardware person — pick sensible parts for me.",
-  "Synthesize the schematic from @bom.json. Use a verified reference design for the buck converter rather than inventing the feedback network.",
-  "Place and route it. Keep the board under 100 by 60 millimetres, four layers, pumps along the right edge, USB-C bottom right, and give the 12 volt rails proper width.",
-  "Run DRC, export the Gerbers, and get me a quote for five boards.",
-  "Fix the clearance error on the 12 volt pour and re-run the check.",
+  "칵테일 로봇을 만들고 있어. 12볼트로 연동 펌프 4개를 구동하고, Wi-Fi로 통신하고, 펌웨어용 USB-C 포트가 필요해. 나는 소프트웨어 개발자라 하드웨어는 잘 몰라 — 적당한 부품을 골라줘.",
+  "@bom.json으로 회로도를 합성해 줘. 벅 컨버터는 피드백 네트워크를 지어내지 말고, 검증된 참조 설계를 사용해 줘.",
+  "배치하고 배선해 줘. 보드는 100×60밀리미터 이내, 4레이어로 하고, 펌프는 오른쪽 가장자리에, USB-C는 오른쪽 아래에 배치해 줘. 12볼트 레일은 폭을 넉넉하게 줘.",
+  "DRC를 실행하고, 거버 파일을 내보내고, 보드 5장 견적을 받아줘.",
+  "12볼트 구리 영역의 간격 오류를 고치고 검사를 다시 실행해 줘.",
 ];
 
 /* =============================================================

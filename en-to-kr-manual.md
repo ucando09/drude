@@ -101,11 +101,16 @@ Schematic/Layout/Fab workspace panel — both Skilled and Easy modes). `DemoFram
 picks between the two based on `useI18n().language`; `LiveDemo` remounts the whole
 desktop demo (`key={language}`) on toggle so the iframe reloads with the right file.
 
-The five prompts that get **typed into the embedded IDE mock stay in English in both
-files** — the mock pattern-matches on English keywords (e.g. `/cocktail|pump|drink|bartend|robot/i`)
-to decide which canned reply to show, so a Korean prompt would silently pick the wrong
-reply. `sync:demo` only ever touches `index.html`; re-translating `index.ko.html` after
-a source-mock change is a manual step (see the comment at the top of that file).
+The five prompts that get **typed into the embedded IDE mock are per-language**: each
+`CHAPTERS[]` entry in `src/lib/demoBridge.ts` carries both `prompt` (English) and
+`promptKo` (Korean), and `createDriver(bridge, events, language)` picks between them.
+Each mock's own `SCRIPT` array pattern-matches the typed text to decide which canned
+reply to show — `index.html` on English keywords (e.g. `/cocktail|pump|drink|bartend|robot/i`),
+`index.ko.html` on the matching Korean ones (e.g. `/칵테일|펌프|로봇|음료|바텐더/`) — so a
+prompt and its mock's regexes have to change together, in both `demoBridge.ts` and the
+corresponding `index*.html`. `sync:demo` only ever touches `index.html`; re-translating
+`index.ko.html` (prompts, regexes, and copy alike) after a source-mock change is a
+manual step (see the comment at the top of that file).
 
 The rail chrome around the iframe (button labels, the caption line) is separately
 translated below, same as any other React-rendered copy.
